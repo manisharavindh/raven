@@ -4,6 +4,7 @@ import sys
 
 from src.raven.config import load_config
 from src.raven.detection.yolo_detector import YOLODetector
+from src.raven.detection.segmenter import RoadSegmenter
 from src.raven.video.reader import VideoReader
 from src.raven.video.processor import VideoProcessor
 from src.raven.tracking.tracker import Tracker
@@ -54,6 +55,8 @@ def main():
     tracker = None
     gps_provider = None
     evidence_capture = None
+    json_store = JSONStore(config.output.detections_json)
+    report_gen = ReportGenerator(config.output.report_json)
     
     if not args.no_tracking:
         logger.info("Initializing Tracker, GPS, and Evidence Capture")
@@ -64,13 +67,17 @@ def main():
         gps_provider = SimulatedGPSProvider(config.gps.simulated_route)
         evidence_capture = EvidenceCapture(config.output.evidence_dir)
         
+    road_segmenter = RoadSegmenter()
+        
     processor = VideoProcessor(
         detector=detector, 
         output_path=output_path,
         tracker=tracker,
         gps_provider=gps_provider,
         evidence_capture=evidence_capture,
-        roi_polygon=config.detection.roi_polygon
+        road_segmenter=road_segmenter,
+        json_store=json_store,
+        report_gen=report_gen
     )
     
     frames_proc, det_count = 0, 0
@@ -88,13 +95,10 @@ def main():
         
     logger.info(f"Pipeline finished successfully. Processed {frames_proc} frames with {det_count} detections.")
     
+    # We now handle saving dynamically during processing, but we can do one final flush here
     if tracker:
         completed_events = tracker.get_all_completed_events()
-        
-        json_store = JSONStore(config.output.detections_json)
         json_store.save(completed_events, model_name=model_path)
-        
-        report_gen = ReportGenerator(config.output.report_json)
         report_gen.generate(completed_events, frames_proc)
 
 if __name__ == "__main__":

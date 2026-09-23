@@ -1,8 +1,12 @@
 {
-  "survey_id": "SURVEY-F88099F0",
-  "timestamp": "2026-09-23T15:21:44.088031",
+  "survey_id": "SURVEY-9E9A0A03",
+  "timestamp": "2026-09-23T23:18:06.983808",
   "surveyed_frames": 0,
-  "total_defects": 0,
-  "average_confidence": 0.0,
-  "breakdown": {}
+  "total_defects": 17,
+  "average_confidence": 0.672,
+  "breakdown": {
+    "other corruption": 7,
+    "Pothole": 4,
+    "longitudinal crack": 6
+  }
 }

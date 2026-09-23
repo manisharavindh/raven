@@ -25,7 +25,7 @@ class YOLODetector(Detector):
         """
         Process a single image frame and return a list of Detection objects.
         """
-        results = self.model(frame, verbose=False)
+        results = self.model(frame, verbose=False, imgsz=1280)
         detections = []
 
         if not results:

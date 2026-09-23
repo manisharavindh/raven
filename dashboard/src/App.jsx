@@ -89,10 +89,10 @@ const App = () => {
     checkLiveStatus();
     const interval = setInterval(() => {
       checkLiveStatus();
-      if (isLiveRunning) fetchTelemetryData();
+      fetchTelemetryData();
     }, 5000);
     return () => clearInterval(interval);
-  }, [isLiveRunning, fetchTelemetryData, checkLiveStatus]);
+  }, [fetchTelemetryData, checkLiveStatus]);
 
   // ===== FILTERING =====
   const filteredEvents = useMemo(() => {
@@ -220,6 +220,7 @@ const App = () => {
               events={filteredEvents}
               selectedId={selectedEventId}
               onSelect={setSelectedEventId}
+              onRefresh={fetchTelemetryData}
             />
           </div>
 

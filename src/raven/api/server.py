@@ -1,8 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import subprocess
 import signal
 import os
+import json
 import time
 import logging
 
@@ -21,6 +23,54 @@ app.add_middleware(
 
 # Global state to track the pipeline subprocess
 active_process = None
+
+# Mount the evidence directory so the dashboard can load images
+app.mount("/data/evidence", StaticFiles(directory="data/evidence"), name="evidence")
+
+@app.get("/data/report.json")
+async def get_report():
+    try:
+        with open("data/exports/report.json", "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+@app.get("/data/detections.json")
+async def get_detections():
+    try:
+        with open("data/exports/detections.json", "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return []
+
+@app.post("/api/events/{event_id}/delete")
+async def delete_event(event_id: str):
+    try:
+        with open("data/exports/detections.json", "r") as f:
+            data = json.load(f)
+        data = [event for event in data if event.get("event_id") != event_id]
+        with open("data/exports/detections.json", "w") as f:
+            json.dump(data, f, indent=2)
+        return {"status": "deleted"}
+    except Exception as e:
+        logger.error(f"Error deleting event {event_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/events/{event_id}/clear")
+async def clear_event(event_id: str):
+    try:
+        with open("data/exports/detections.json", "r") as f:
+            data = json.load(f)
+        for event in data:
+            if event.get("event_id") == event_id:
+                event["status"] = "cleared"
+                break
+        with open("data/exports/detections.json", "w") as f:
+            json.dump(data, f, indent=2)
+        return {"status": "cleared"}
+    except Exception as e:
+        logger.error(f"Error clearing event {event_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/live/start")
 async def start_live_camera():

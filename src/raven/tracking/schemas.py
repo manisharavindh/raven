@@ -17,6 +17,7 @@ class TrackedEvent(BaseModel):
     gps_position: Optional[GPSPosition] = None
     evidence_path: Optional[str] = None
     status: str = "detected"
+    timestamp: float = 0.0
     
     @property
     def current_confidence(self) -> float:

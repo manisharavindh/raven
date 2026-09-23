@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 
-const DefectTable = ({ events, selectedId, onSelect }) => {
+const DefectTable = ({ events, selectedId, onSelect, onRefresh }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortCol, setSortCol] = useState('event_id');
   const [sortAsc, setSortAsc] = useState(true);
@@ -67,6 +67,27 @@ const DefectTable = ({ events, selectedId, onSelect }) => {
     return result;
   }, [events, searchQuery, sortCol, sortAsc]);
 
+  const handleDelete = async (e, id) => {
+    e.stopPropagation();
+    try {
+      await fetch(`/api/events/${id}/delete`, { method: 'POST' });
+      if (onRefresh) onRefresh();
+      if (selectedId === id) onSelect(null);
+    } catch (err) {
+      console.error('Failed to delete', err);
+    }
+  };
+
+  const handleClear = async (e, id) => {
+    e.stopPropagation();
+    try {
+      await fetch(`/api/events/${id}/clear`, { method: 'POST' });
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error('Failed to clear', err);
+    }
+  };
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -131,21 +152,20 @@ const DefectTable = ({ events, selectedId, onSelect }) => {
         <table className="defect-table">
           <thead>
             <tr>
-              <th style={{ width: '24%' }} onClick={() => handleSort('event_id')}>
+              <th style={{ width: '15%' }} onClick={() => handleSort('event_id')}>
                 ID<span className="sort-arrow">{sortArrow('event_id')}</span>
               </th>
-              <th style={{ width: '22%' }} onClick={() => handleSort('type')}>
+              <th style={{ width: '15%' }} onClick={() => handleSort('timestamp')}>
+                Time<span className="sort-arrow">{sortArrow('timestamp')}</span>
+              </th>
+              <th style={{ width: '18%' }} onClick={() => handleSort('type')}>
                 Type<span className="sort-arrow">{sortArrow('type')}</span>
               </th>
               <th style={{ width: '22%' }} onClick={() => handleSort('confidence')}>
                 Conf<span className="sort-arrow">{sortArrow('confidence')}</span>
               </th>
-              <th style={{ width: '16%' }} onClick={() => handleSort('latitude')}>
-                Lat<span className="sort-arrow">{sortArrow('latitude')}</span>
-              </th>
-              <th style={{ width: '16%' }} onClick={() => handleSort('longitude')}>
-                Lng<span className="sort-arrow">{sortArrow('longitude')}</span>
-              </th>
+              <th style={{ width: '15%' }}>Loc</th>
+              <th style={{ width: '15%' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -156,35 +176,59 @@ const DefectTable = ({ events, selectedId, onSelect }) => {
                 </td>
               </tr>
             ) : (
-              filteredAndSorted.map((event) => (
-                <tr
-                  key={event.event_id}
-                  data-id={event.event_id}
-                  className={selectedId === event.event_id ? 'selected' : ''}
-                  onClick={() => onSelect(event.event_id)}
-                >
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>{event.event_id}</td>
-                  <td>
-                    <span className={`badge ${isCritical(event.type) ? 'badge-critical' : 'badge-warning'}`}>
-                      {event.type.toUpperCase()}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="conf-bar">
-                      <div
-                        className="conf-bar-fill"
-                        style={{
-                          width: `${event.confidence * 100}%`,
-                          backgroundColor: isCritical(event.type) ? 'var(--accent-red)' : 'var(--accent-amber)',
-                        }}
-                      />
-                    </span>
-                    {(event.confidence * 100).toFixed(0)}%
-                  </td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>{event.latitude.toFixed(4)}</td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>{event.longitude.toFixed(4)}</td>
-                </tr>
-              ))
+              filteredAndSorted.map((event) => {
+                const isCleared = event.status === 'cleared';
+                return (
+                  <tr
+                    key={event.event_id}
+                    data-id={event.event_id}
+                    className={`${selectedId === event.event_id ? 'selected' : ''} ${isCleared ? 'cleared-row' : ''}`}
+                    onClick={() => onSelect(event.event_id)}
+                    style={{ opacity: isCleared ? 0.5 : 1 }}
+                  >
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>{event.event_id}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>{(event.timestamp || 0).toFixed(1)}s</td>
+                    <td>
+                      <span className={`badge ${isCritical(event.type) ? 'badge-critical' : 'badge-warning'}`}>
+                        {event.type.toUpperCase()}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="conf-bar">
+                        <div
+                          className="conf-bar-fill"
+                          style={{
+                            width: `${event.confidence * 100}%`,
+                            backgroundColor: isCritical(event.type) ? 'var(--accent-red)' : 'var(--accent-amber)',
+                          }}
+                        />
+                      </span>
+                      {(event.confidence * 100).toFixed(0)}%
+                    </td>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>
+                      {event.latitude ? `${event.latitude.toFixed(2)},${event.longitude.toFixed(2)}` : 'N/A'}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {!isCleared && (
+                          <button 
+                            style={{ padding: '2px 6px', fontSize: 10, cursor: 'pointer' }}
+                            onClick={(e) => handleClear(e, event.event_id)}
+                          >
+                            Clear
+                          </button>
+                        )}
+                        <button 
+                          style={{ padding: '2px 6px', fontSize: 10, cursor: 'pointer', color: 'red' }}
+                          onClick={(e) => handleDelete(e, event.event_id)}
+                        >
+                          Del
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

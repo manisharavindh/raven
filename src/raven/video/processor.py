@@ -11,6 +11,9 @@ from src.raven.tracking.tracker import Tracker
 from src.raven.tracking.schemas import TrackedEvent
 from src.raven.geolocation.gps import GPSProvider
 from src.raven.evidence.capture import EvidenceCapture
+from src.raven.detection.segmenter import RoadSegmenter
+from src.raven.storage.json_store import JSONStore
+from src.raven.reports.generator import ReportGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -25,14 +28,18 @@ class VideoProcessor:
         tracker: Optional[Tracker] = None,
         gps_provider: Optional[GPSProvider] = None,
         evidence_capture: Optional[EvidenceCapture] = None,
-        roi_polygon: Optional[List[List[float]]] = None
+        road_segmenter: Optional[RoadSegmenter] = None,
+        json_store: Optional[JSONStore] = None,
+        report_gen: Optional[ReportGenerator] = None
     ):
         self.detector = detector
         self.output_path = output_path
         self.tracker = tracker
         self.gps_provider = gps_provider
         self.evidence_capture = evidence_capture
-        self.roi_polygon = roi_polygon
+        self.road_segmenter = road_segmenter
+        self.json_store = json_store
+        self.report_gen = report_gen
         
         # Ensure output directory exists
         os.makedirs(os.path.dirname(os.path.abspath(self.output_path)), exist_ok=True)
@@ -56,21 +63,24 @@ class VideoProcessor:
             # 1. Detection
             raw_detections = self.detector.detect(frame, frame_number, timestamp)
             
-            # 1b. ROI Filtering
+            # 1b. Dynamic ROI Filtering (Road Layer)
             detections = []
-            if self.roi_polygon:
-                # Convert relative polygon to absolute pixel coordinates
-                h, w = frame.shape[:2]
-                abs_polygon = np.array([
-                    [int(pt[0] * w), int(pt[1] * h)] for pt in self.roi_polygon
-                ], np.int32)
+            road_mask = None
+            if self.road_segmenter:
+                road_mask = self.road_segmenter.get_road_mask(frame)
                 
+            if road_mask is not None:
+                h, w = frame.shape[:2]
                 for det in raw_detections:
-                    # Check if the bottom-center of the bounding box is in the ROI
-                    center_x = (det.bbox.x1 + det.bbox.x2) / 2.0
-                    bottom_y = det.bbox.y2
+                    # Check if the bottom-center of the bounding box is in the road mask
+                    center_x = int((det.bbox.x1 + det.bbox.x2) / 2.0)
+                    bottom_y = int(det.bbox.y2)
                     
-                    if cv2.pointPolygonTest(abs_polygon, (center_x, bottom_y), False) >= 0:
+                    # Ensure coordinates are within bounds
+                    center_x = max(0, min(w - 1, center_x))
+                    bottom_y = max(0, min(h - 1, bottom_y))
+                    
+                    if road_mask[bottom_y, center_x] > 0:
                         detections.append(det)
             else:
                 detections = raw_detections
@@ -102,13 +112,12 @@ class VideoProcessor:
             else:
                 annotated_frame = self._annotate_frame(frame, detections)
                 
-            # Draw ROI if present
-            if self.roi_polygon:
-                h, w = frame.shape[:2]
-                abs_polygon = np.array([
-                    [int(pt[0] * w), int(pt[1] * h)] for pt in self.roi_polygon
-                ], np.int32)
-                cv2.polylines(annotated_frame, [abs_polygon], isClosed=True, color=(255, 0, 0), thickness=2)
+            # Draw Dynamic Road Layer if present
+            if road_mask is not None:
+                # Create a translucent green layer for the road
+                overlay = annotated_frame.copy()
+                overlay[road_mask > 0] = (0, 255, 0) # Green for road
+                cv2.addWeighted(overlay, 0.25, annotated_frame, 0.75, 0, annotated_frame)
             
             # 4. Write and Display
             out.write(annotated_frame)
@@ -126,6 +135,16 @@ class VideoProcessor:
                     logger.info(f"Processed {processed_frames} frames (LIVE)...")
                 else:
                     logger.info(f"Processed {processed_frames}/{reader.frame_count} frames...")
+                    
+                # Flush live data to JSON so dashboard can read it instantly
+                if self.tracker and self.json_store:
+                    completed = self.tracker.get_all_completed_events()
+                    active = list(self.tracker.active_events.values())
+                    all_events = completed + active
+                    
+                    self.json_store.save(all_events, model_name="Live Feed")
+                    if self.report_gen:
+                        self.report_gen.generate(all_events, processed_frames)
                 
         out.release()
         cv2.destroyAllWindows()

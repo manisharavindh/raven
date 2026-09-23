@@ -124,7 +124,8 @@ class Tracker:
             last_frame=detection.frame_number,
             confidence_history=[detection.confidence],
             bbox_history=[detection.bbox],
-            status="detected"
+            status="detected",
+            timestamp=detection.timestamp
         )
         self.active_events[event_id] = event
         self.disappeared_counts[event_id] = 0
