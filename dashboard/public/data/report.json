@@ -1,0 +1,14 @@
+{
+  "survey_id": "SURVEY-6DD937BB",
+  "timestamp": "2026-09-23T12:22:01.442697",
+  "surveyed_frames": 9353,
+  "total_defects": 51,
+  "average_confidence": 0.6466,
+  "breakdown": {
+    "other corruption": 10,
+    "Pothole": 20,
+    "longitudinal crack": 17,
+    "alligator crack": 3,
+    "transverse crack": 1
+  }
+}

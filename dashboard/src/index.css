@@ -1,0 +1,162 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400&display=swap');
+@import "leaflet/dist/leaflet.css";
+
+:root {
+  --mac-teal: #55aaaa;
+  --mac-gray: #dddddd;
+  --mac-dark-gray: #aaaaaa;
+  --mac-border: #000000;
+  
+  --text-primary: #000000;
+  --text-secondary: #333333;
+  
+  --accent-cyan: #0000ff; /* Classic Mac blue selection */
+  --accent-amber: #ff9900;
+  --accent-red: #cc0000;
+  --accent-green: #008800;
+  --accent-purple: #8b008b;
+  
+  --font-main: "Geneva", "Chicago", "Helvetica", sans-serif;
+  --font-mono: "Monaco", "Courier", monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-main);
+  /* Classic Mac OS Teal Desktop */
+  background-color: var(--mac-teal); 
+  color: var(--text-primary);
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+::-webkit-scrollbar {
+  width: 16px;
+}
+::-webkit-scrollbar-track {
+  background: white;
+  border-left: 1px solid var(--mac-border);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--mac-gray);
+  border: 1px solid var(--mac-border);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--mac-dark-gray);
+}
+
+/* Classic Mac OS Window */
+.glass-panel {
+  background: var(--mac-gray);
+  border: 1px solid var(--mac-border);
+  box-shadow: 2px 2px 0px rgba(0,0,0,1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Mac OS Title Bar with Stripes */
+.panel-header {
+  background-color: var(--mac-gray);
+  background-image: repeating-linear-gradient(to bottom, #ffffff 0px, #ffffff 1px, #aaaaaa 1px, #aaaaaa 2px);
+  color: black;
+  padding: 2px 8px;
+  font-weight: bold;
+  font-size: 13px;
+  border-bottom: 1px solid var(--mac-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
+
+/* We need to block out the stripes behind the text */
+.panel-header > * {
+  background: var(--mac-gray);
+  padding: 0 5px;
+  border: 1px solid var(--mac-gray);
+}
+
+/* Select Inputs */
+select {
+  background-color: white;
+  border: 2px solid var(--mac-border);
+  padding: 2px;
+  color: black;
+  font-family: var(--font-main);
+  font-size: 12px;
+  box-shadow: inset 1px 1px 0px #000;
+}
+
+/* Buttons -> Mac OS Classic Buttons */
+.btn-primary, .btn-danger {
+  background: var(--mac-gray);
+  border: 2px solid var(--mac-border);
+  border-radius: 6px;
+  color: black;
+  padding: 4px 15px;
+  font-weight: bold;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: inset -1px -1px 0px #888, inset 1px 1px 0px #fff;
+}
+
+.btn-primary:active, .btn-danger:active {
+  background: #bbbbbb;
+  box-shadow: inset 2px 2px 0px #000;
+}
+
+/* Map specific overrides */
+.leaflet-container {
+  background-color: #e5e3df !important;
+  font-family: var(--font-main);
+  border: 1px solid var(--mac-border);
+}
+
+.leaflet-tile {
+  filter: grayscale(100%) contrast(1.2); /* Make the map look old school black & white! */
+}
+
+/* Classic Mac Tooltips */
+.glass-popup .leaflet-popup-content-wrapper {
+  background: #ffffe1;
+  color: black;
+  border: 1px solid var(--mac-border);
+  border-radius: 0;
+  box-shadow: 2px 2px 0px rgba(0,0,0,1);
+}
+
+.glass-popup .leaflet-popup-tip {
+  background: #ffffe1;
+  border: 1px solid var(--mac-border);
+}
+
+/* List Items */
+.list-item {
+  padding: 8px 10px;
+  border-bottom: 1px dashed var(--mac-dark-gray);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: white;
+  color: black;
+}
+
+.list-item:hover {
+  background-color: #eeeeee;
+}
+
+.list-item.selected {
+  background-color: var(--accent-cyan);
+  color: white;
+}

@@ -1,0 +1,20 @@
+detection:
+  model_path: "models/rdd2022_yolov8.pt"
+  confidence_threshold: 0.35
+  roi_polygon: [[0.0, 0.5], [1.0, 0.5], [1.0, 1.0], [0.0, 1.0]]
+
+video:
+  input_path: "data/input/road_video.mp4"
+  output_path: "data/exports/raven_annotated.mp4"
+
+output:
+  evidence_dir: "data/evidence"
+  detections_json: "data/exports/detections.json"
+  report_json: "data/exports/report.json"
+
+gps:
+  simulated_route: "data/simulated/route.json"
+
+tracking:
+  max_disappeared: 10
+  iou_threshold: 0.3

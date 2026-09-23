@@ -179,3 +179,14 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+
+.DS_Store
+data/evidence/*
+# Environment variables
+.env
+
+data/input/camber_video_50.mp4
+dashboard/public/data/raven_annotated.mp4
+
+prompts
