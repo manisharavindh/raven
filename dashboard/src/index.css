@@ -2,22 +2,31 @@
 @import "leaflet/dist/leaflet.css";
 
 :root {
-  --mac-teal: #55aaaa;
-  --mac-gray: #dddddd;
-  --mac-dark-gray: #aaaaaa;
-  --mac-border: #000000;
-  
+  /* Mac OS Classic Platinum palette */
+  --mac-white: #ffffff;
+  --mac-highlight: #f0f0f0;
+  --mac-light: #dddddd;
+  --mac-base: #c0c0c0;
+  --mac-mid: #999999;
+  --mac-shadow: #808080;
+  --mac-dark: #333333;
+  --mac-black: #000000;
+  --mac-desktop: #3b6ea5;
+
   --text-primary: #000000;
-  --text-secondary: #333333;
-  
-  --accent-cyan: #0000ff; /* Classic Mac blue selection */
-  --accent-amber: #ff9900;
+  --text-secondary: #555555;
+  --text-disabled: #888888;
+
+  --accent-blue: #0000cc;
   --accent-red: #cc0000;
+  --accent-amber: #cc7700;
   --accent-green: #008800;
-  --accent-purple: #8b008b;
-  
-  --font-main: "Geneva", "Chicago", "Helvetica", sans-serif;
-  --font-mono: "Monaco", "Courier", monospace;
+
+  --selection-bg: #3366cc;
+  --selection-text: #ffffff;
+
+  --font-main: "Geneva", "Lucida Grande", "Helvetica Neue", Helvetica, sans-serif;
+  --font-mono: "Monaco", "Menlo", "Courier New", monospace;
 }
 
 * {
@@ -28,135 +37,469 @@
 
 body {
   font-family: var(--font-main);
-  /* Classic Mac OS Teal Desktop */
-  background-color: var(--mac-teal); 
+  font-size: 12px;
+  background-color: var(--mac-desktop);
   color: var(--text-primary);
-  line-height: 1.5;
+  line-height: 1.4;
   overflow: hidden;
+  -webkit-font-smoothing: none; /* pixel-sharp like old Mac */
 }
 
-::-webkit-scrollbar {
-  width: 16px;
-}
-::-webkit-scrollbar-track {
-  background: white;
-  border-left: 1px solid var(--mac-border);
-}
+/* ===== SCROLLBARS ===== */
+::-webkit-scrollbar { width: 16px; height: 16px; }
+::-webkit-scrollbar-track { background: var(--mac-highlight); border-left: 1px solid var(--mac-shadow); }
 ::-webkit-scrollbar-thumb {
-  background: var(--mac-gray);
-  border: 1px solid var(--mac-border);
+  background: var(--mac-base);
+  border: 1px solid var(--mac-shadow);
 }
-::-webkit-scrollbar-thumb:hover {
-  background: var(--mac-dark-gray);
+::-webkit-scrollbar-thumb:hover { background: var(--mac-mid); }
+::-webkit-scrollbar-button { display: block; height: 16px; background: var(--mac-base); border: 1px solid var(--mac-shadow); }
+
+/* ===== MAC MENU BAR ===== */
+.menu-bar {
+  background: linear-gradient(to bottom, var(--mac-white) 0%, var(--mac-light) 100%);
+  border-bottom: 1px solid var(--mac-shadow);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  height: 22px;
+  font-size: 12px;
+  font-weight: bold;
+  gap: 0;
+  position: relative;
+  z-index: 100;
+  user-select: none;
 }
 
-/* Classic Mac OS Window */
-.glass-panel {
-  background: var(--mac-gray);
-  border: 1px solid var(--mac-border);
-  box-shadow: 2px 2px 0px rgba(0,0,0,1);
+.menu-item {
+  padding: 2px 12px;
+  cursor: default;
+  position: relative;
+  border-radius: 0;
+  color: var(--text-primary);
+}
+
+.menu-item:hover,
+.menu-item.open {
+  background: var(--selection-bg);
+  color: var(--selection-text);
+}
+
+.menu-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 200px;
+  background: var(--mac-white);
+  border: 1px solid var(--mac-black);
+  box-shadow: 3px 3px 0px rgba(0,0,0,0.3);
+  z-index: 200;
+  padding: 2px 0;
+}
+
+.menu-dropdown-item {
+  padding: 3px 20px;
+  cursor: default;
+  font-weight: normal;
+  white-space: nowrap;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--text-primary);
+}
+
+.menu-dropdown-item:hover {
+  background: var(--selection-bg);
+  color: var(--selection-text);
+}
+
+.menu-dropdown-item .shortcut {
+  color: var(--text-secondary);
+  font-size: 11px;
+  margin-left: 30px;
+}
+
+.menu-dropdown-item:hover .shortcut {
+  color: var(--selection-text);
+}
+
+.menu-separator {
+  height: 1px;
+  background: var(--mac-shadow);
+  margin: 3px 0;
+}
+
+/* ===== WINDOW (replaces glass-panel) ===== */
+.glass-panel, .mac-window {
+  background: var(--mac-light);
+  border: 1px solid var(--mac-black);
+  box-shadow: 1px 1px 0px var(--mac-black);
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
-/* Mac OS Title Bar with Stripes */
-.panel-header {
-  background-color: var(--mac-gray);
-  background-image: repeating-linear-gradient(to bottom, #ffffff 0px, #ffffff 1px, #aaaaaa 1px, #aaaaaa 2px);
-  color: black;
+/* ===== TITLE BAR (replaces panel-header) ===== */
+.panel-header, .mac-titlebar {
+  background: linear-gradient(to bottom,
+    #f8f8f8 0%, #e8e8e8 4%,
+    #d0d0d0 50%, #c8c8c8 51%,
+    #b8b8b8 100%
+  );
+  color: var(--text-primary);
   padding: 2px 8px;
   font-weight: bold;
-  font-size: 13px;
-  border-bottom: 1px solid var(--mac-border);
+  font-size: 12px;
+  border-bottom: 1px solid var(--mac-shadow);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  text-align: center;
+  gap: 6px;
+  min-height: 20px;
+  position: relative;
 }
 
-/* We need to block out the stripes behind the text */
-.panel-header > * {
-  background: var(--mac-gray);
-  padding: 0 5px;
-  border: 1px solid var(--mac-gray);
+/* Active (focused) window title bar */
+.mac-titlebar-active, .panel-header {
+  background: linear-gradient(to bottom,
+    #f8f8f8 0%, #d8d8d8 4%,
+    #b8b8b8 50%, #a8a8a8 51%,
+    #909090 100%
+  );
 }
 
-/* Select Inputs */
+/* Title bar stripes */
+.mac-titlebar::before,
+.mac-titlebar::after,
+.panel-header::before,
+.panel-header::after {
+  content: '';
+  flex: 1;
+  height: 12px;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px, transparent 1px,
+    var(--mac-shadow) 1px, var(--mac-shadow) 2px,
+    transparent 2px, transparent 3px
+  );
+}
+
+/* Wrap title text so stripes show on sides */
+.panel-header > *, .mac-titlebar > * {
+  background: inherit;
+  padding: 0 6px;
+  z-index: 1;
+}
+
+/* ===== BUTTONS ===== */
+.btn-primary, .btn-danger, .mac-btn {
+  background: linear-gradient(to bottom, var(--mac-white) 0%, var(--mac-base) 100%);
+  border: 1px solid var(--mac-shadow);
+  border-radius: 4px;
+  color: var(--text-primary);
+  padding: 3px 16px;
+  font-family: var(--font-main);
+  font-weight: bold;
+  font-size: 12px;
+  cursor: default;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 1px 0 var(--mac-white) inset;
+}
+
+.btn-primary:active, .btn-danger:active, .mac-btn:active {
+  background: linear-gradient(to bottom, var(--mac-base) 0%, var(--mac-light) 100%);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3) inset;
+}
+
+/* ===== SELECT INPUTS ===== */
 select {
-  background-color: white;
-  border: 2px solid var(--mac-border);
-  padding: 2px;
-  color: black;
+  background: var(--mac-white);
+  border: 1px solid var(--mac-shadow);
+  padding: 2px 4px;
+  color: var(--text-primary);
+  font-family: var(--font-main);
+  font-size: 11px;
+  border-radius: 0;
+}
+
+/* ===== TEXT INPUT ===== */
+input[type="text"], input[type="search"] {
+  background: var(--mac-white);
+  border: 2px solid var(--mac-shadow);
+  border-top-color: var(--mac-dark);
+  border-left-color: var(--mac-dark);
+  padding: 2px 6px;
   font-family: var(--font-main);
   font-size: 12px;
-  box-shadow: inset 1px 1px 0px #000;
+  color: var(--text-primary);
+  outline: none;
 }
 
-/* Buttons -> Mac OS Classic Buttons */
-.btn-primary, .btn-danger {
-  background: var(--mac-gray);
-  border: 2px solid var(--mac-border);
-  border-radius: 6px;
-  color: black;
-  padding: 4px 15px;
+input[type="text"]:focus, input[type="search"]:focus {
+  border-color: var(--accent-blue);
+}
+
+/* ===== TABLE ===== */
+.defect-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  table-layout: fixed;
+}
+
+.defect-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.defect-table th {
+  background: linear-gradient(to bottom, var(--mac-white) 0%, var(--mac-base) 100%);
+  border: 1px solid var(--mac-shadow);
+  border-right: 1px solid var(--mac-dark);
+  padding: 2px 6px;
+  text-align: left;
+  cursor: default;
   font-weight: bold;
-  font-size: 13px;
-  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.defect-table th:hover {
+  background: linear-gradient(to bottom, var(--mac-light) 0%, var(--mac-mid) 100%);
+}
+
+.defect-table th .sort-arrow {
+  font-size: 9px;
+  margin-left: 2px;
+}
+
+.defect-table td {
+  padding: 2px 6px;
+  border-bottom: 1px solid var(--mac-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.defect-table tr {
+  background: var(--mac-white);
+  cursor: default;
+}
+
+.defect-table tr:hover {
+  background: #e8e8ff;
+}
+
+.defect-table tr.selected {
+  background: var(--selection-bg);
+  color: var(--selection-text);
+}
+
+.defect-table tr.selected td {
+  color: var(--selection-text);
+}
+
+/* ===== SEVERITY BADGES ===== */
+.badge {
+  display: inline-block;
+  padding: 0px 6px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.badge-critical {
+  background: #ffcccc;
+  color: var(--accent-red);
+  border: 1px solid var(--accent-red);
+}
+
+.badge-warning {
+  background: #fff0cc;
+  color: var(--accent-amber);
+  border: 1px solid var(--accent-amber);
+}
+
+/* ===== STATUS BAR ===== */
+.status-bar {
+  background: linear-gradient(to bottom, var(--mac-light) 0%, var(--mac-base) 100%);
+  border-top: 1px solid var(--mac-shadow);
+  padding: 2px 10px;
+  font-size: 11px;
   display: flex;
   align-items: center;
-  gap: 5px;
-  box-shadow: inset -1px -1px 0px #888, inset 1px 1px 0px #fff;
+  gap: 16px;
+  min-height: 20px;
+  color: var(--text-primary);
 }
 
-.btn-primary:active, .btn-danger:active {
-  background: #bbbbbb;
-  box-shadow: inset 2px 2px 0px #000;
+.status-bar-section {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-/* Map specific overrides */
+.status-bar-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--mac-shadow);
+}
+
+.status-bar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Live indicator blink */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-red);
+  animation: blink 1s infinite;
+}
+
+/* ===== MAP ===== */
 .leaflet-container {
   background-color: #e5e3df !important;
   font-family: var(--font-main);
-  border: 1px solid var(--mac-border);
 }
 
 .leaflet-tile {
-  filter: grayscale(100%) contrast(1.2); /* Make the map look old school black & white! */
+  filter: none !important; /* Full color map for readability */
 }
 
-/* Classic Mac Tooltips */
 .glass-popup .leaflet-popup-content-wrapper {
-  background: #ffffe1;
-  color: black;
-  border: 1px solid var(--mac-border);
+  background: var(--mac-white);
+  color: var(--text-primary);
+  border: 1px solid var(--mac-black);
   border-radius: 0;
-  box-shadow: 2px 2px 0px rgba(0,0,0,1);
+  box-shadow: 2px 2px 0px rgba(0,0,0,0.3);
+  font-family: var(--font-main);
+  font-size: 11px;
+  padding: 0;
+}
+
+.glass-popup .leaflet-popup-content {
+  margin: 8px;
 }
 
 .glass-popup .leaflet-popup-tip {
-  background: #ffffe1;
-  border: 1px solid var(--mac-border);
+  background: var(--mac-white);
+  border: 1px solid var(--mac-black);
 }
 
-/* List Items */
-.list-item {
-  padding: 8px 10px;
-  border-bottom: 1px dashed var(--mac-dark-gray);
-  cursor: pointer;
+/* ===== TOOLBAR ===== */
+.toolbar {
+  background: var(--mac-light);
+  border-bottom: 1px solid var(--mac-shadow);
+  padding: 4px 8px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  background-color: white;
-  color: black;
+  gap: 6px;
 }
 
-.list-item:hover {
-  background-color: #eeeeee;
+/* ===== EVIDENCE PANEL ===== */
+.evidence-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--mac-light);
+  font-size: 11px;
 }
 
-.list-item.selected {
-  background-color: var(--accent-cyan);
-  color: white;
+.evidence-meta-label {
+  color: var(--text-secondary);
+  font-weight: bold;
+  min-width: 80px;
+}
+
+.copy-btn {
+  background: var(--mac-light);
+  border: 1px solid var(--mac-shadow);
+  border-radius: 2px;
+  padding: 1px 6px;
+  font-size: 10px;
+  cursor: pointer;
+  font-family: var(--font-main);
+}
+
+.copy-btn:active {
+  background: var(--mac-mid);
+}
+
+/* ===== MODAL OVERLAY ===== */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.modal-overlay img {
+  max-width: 90%;
+  max-height: 85vh;
+  border: 2px solid var(--mac-black);
+  box-shadow: 4px 4px 0px rgba(0,0,0,0.5);
+}
+
+/* ===== CONFIDENCE BAR ===== */
+.conf-bar {
+  width: 50px;
+  height: 8px;
+  background: var(--mac-light);
+  border: 1px solid var(--mac-shadow);
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+.conf-bar-fill {
+  height: 100%;
+}
+
+/* ===== RESIZER HANDLES ===== */
+.resizer-h {
+  width: 5px;
+  cursor: col-resize;
+  background: var(--mac-base);
+  border-left: 1px solid var(--mac-shadow);
+  border-right: 1px solid var(--mac-shadow);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+
+.resizer-h:hover, .resizer-h.active {
+  background: var(--selection-bg);
+}
+
+.resizer-v {
+  height: 5px;
+  cursor: row-resize;
+  background: var(--mac-base);
+  border-top: 1px solid var(--mac-shadow);
+  border-bottom: 1px solid var(--mac-shadow);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+
+.resizer-v:hover, .resizer-v.active {
+  background: var(--selection-bg);
 }
