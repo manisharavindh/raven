@@ -16,6 +16,9 @@ class OutputConfig(BaseModel):
     detections_json: str
     report_json: str
 
+class DatabaseConfig(BaseModel):
+    db_path: str = "data/raven.db"
+
 class GPSConfig(BaseModel):
     simulated_route: str
 
@@ -29,6 +32,7 @@ class AppConfig(BaseModel):
     output: OutputConfig
     gps: GPSConfig
     tracking: TrackingConfig
+    database: DatabaseConfig = DatabaseConfig()
 
 def load_config(config_path: str = "configs/config.yaml") -> AppConfig:
     with open(config_path, "r") as f:

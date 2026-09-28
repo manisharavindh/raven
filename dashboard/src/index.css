@@ -129,6 +129,48 @@ body {
   margin: 3px 0;
 }
 
+.menu-dropdown-item-danger {
+  color: var(--accent-red);
+}
+
+.menu-dropdown-item-danger:hover {
+  background: var(--accent-red);
+  color: var(--mac-white);
+}
+
+/* Danger button (for destructive confirmation dialogs) */
+.mac-btn-danger {
+  background: linear-gradient(to bottom, #ff6666 0%, #cc0000 100%);
+  border: 1px solid #990000;
+  border-radius: 4px;
+  color: var(--mac-white);
+  padding: 3px 16px;
+  font-family: var(--font-main);
+  font-weight: bold;
+  font-size: 12px;
+  cursor: default;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset;
+}
+
+.mac-btn-danger:active {
+  background: linear-gradient(to bottom, #cc0000 0%, #990000 100%);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.4) inset;
+}
+
+/* Disabled menu items */
+.menu-dropdown-item-disabled {
+  color: var(--text-disabled) !important;
+  cursor: default;
+}
+
+.menu-dropdown-item-disabled:hover {
+  background: none !important;
+  color: var(--text-disabled) !important;
+}
+
 /* ===== WINDOW (replaces glass-panel) ===== */
 .glass-panel, .mac-window {
   background: var(--mac-light);

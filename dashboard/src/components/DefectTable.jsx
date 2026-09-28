@@ -171,7 +171,7 @@ const DefectTable = ({ events, selectedId, onSelect, onRefresh }) => {
           <tbody>
             {filteredAndSorted.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)' }}>
+                <td colSpan={6} style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)' }}>
                   {events.length === 0 ? 'No defects detected.' : 'No results match your search.'}
                 </td>
               </tr>

@@ -3,6 +3,11 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# SQLite database files
+*.db
+*.db-wal
+*.db-shm
+
 # C extensions
 *.so
 
@@ -181,12 +186,51 @@ cython_debug/
 .cursorindexingignore
 
 
+# OS generated files
 .DS_Store
-data/evidence/*
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
 # Environment variables
 .env
+.env.local
+.env.*.local
 
-data/input/camber_video_50.mp4
-dashboard/public/data/raven_annotated.mp4
+# Scratch and arbitrary run logs
+scratch/
+run.txt
+toto.txt
 
+# Data Directories
+# We ignore contents but keep the directory structures via .gitkeep
+data/evidence/*
+!data/evidence/.gitkeep
+
+data/input/*
+!data/input/.gitkeep
+# Optionally allow sample videos if they are explicitly added:
+# !data/input/sample.mp4
+
+data/exports/*
+!data/exports/.gitkeep
+
+# Ensure legacy data paths are ignored
+dashboard/public/data/*
+!dashboard/public/data/.gitkeep
+
+# Prompts and LLM context files
+prompts/
 prompts
+
+# PyTorch/YOLO Weights
+# Note: models > 100MB cannot be pushed to Github without Git LFS.
+# We will track small models if explicitly committed, but ignore weights dir.
+weights/
+runs/
+*.pt
+!models/pothole_yolov8.pt
+!models/rdd2022_yolov8.pt

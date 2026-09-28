@@ -41,7 +41,6 @@ const StatusBar = ({ events, report, isLiveRunning }) => {
       <div className="status-bar-right">
         {isLiveRunning && (
           <>
-            <div className="live-dot" />
             <span style={{ color: 'var(--accent-red)', fontWeight: 'bold' }}>RECORDING</span>
           </>
         )}

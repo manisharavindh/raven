@@ -29,6 +29,8 @@ const MenuBar = ({ onAction, isLiveRunning, filterType }) => {
       { label: 'Export as JSON', action: 'export-json', shortcut: '⌘J' },
       { separator: true },
       { label: 'Refresh Data', action: 'refresh', shortcut: '⌘R' },
+      { separator: true },
+      { label: 'Delete All Data…', action: 'delete-all-data', danger: true },
     ],
     View: [
       { label: 'All Defects', action: 'filter-all', shortcut: '1', checked: filterType === 'ALL' },
@@ -36,7 +38,10 @@ const MenuBar = ({ onAction, isLiveRunning, filterType }) => {
       { label: 'Cracks Only', action: 'filter-cracks', shortcut: '3', checked: filterType === 'WARNING' },
     ],
     Tools: [
-      { label: isLiveRunning ? 'Stop Camera' : 'Start Live Camera', action: 'toggle-camera' },
+      { label: 'Run Detection…', action: 'start-detection', disabled: isLiveRunning },
+      { label: 'Start Live Camera', action: 'start-live', disabled: isLiveRunning },
+      { separator: true },
+      { label: 'Stop Pipeline', action: 'stop-pipeline', disabled: !isLiveRunning },
     ],
     Help: [
       { label: 'Keyboard Shortcuts', action: 'show-shortcuts' },
@@ -59,7 +64,14 @@ const MenuBar = ({ onAction, isLiveRunning, filterType }) => {
                 item.separator ? (
                   <div key={i} className="menu-separator" />
                 ) : (
-                  <div key={i} className="menu-dropdown-item" onMouseDown={(e) => { e.stopPropagation(); handleAction(item.action); }}>
+                  <div
+                    key={i}
+                    className={`menu-dropdown-item ${item.danger ? 'menu-dropdown-item-danger' : ''} ${item.disabled ? 'menu-dropdown-item-disabled' : ''}`}
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      if (!item.disabled) handleAction(item.action);
+                    }}
+                  >
                     <span>{item.checked ? '✓ ' : ''}{item.label}</span>
                     {item.shortcut && <span className="shortcut">{item.shortcut}</span>}
                   </div>
@@ -71,6 +83,11 @@ const MenuBar = ({ onAction, isLiveRunning, filterType }) => {
       ))}
 
       <div style={{ flex: 1 }} />
+      {isLiveRunning && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginRight: 8 }}>
+          <span style={{ color: 'var(--accent-red)', fontWeight: 'bold', fontSize: 11 }}>LIVE</span>
+        </div>
+      )}
       <div style={{ fontWeight: 'bold', paddingRight: 8 }}>RAVEN</div>
     </div>
   );

@@ -1,6 +1,7 @@
 import cv2
 import logging
 import os
+import threading
 from typing import List, Optional
 import numpy as np
 
@@ -14,6 +15,7 @@ from src.raven.evidence.capture import EvidenceCapture
 from src.raven.detection.segmenter import RoadSegmenter
 from src.raven.storage.json_store import JSONStore
 from src.raven.reports.generator import ReportGenerator
+from src.raven.video.frame_buffer import FrameBuffer
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +32,14 @@ class VideoProcessor:
         evidence_capture: Optional[EvidenceCapture] = None,
         road_segmenter: Optional[RoadSegmenter] = None,
         json_store: Optional[JSONStore] = None,
-        report_gen: Optional[ReportGenerator] = None
+        report_gen: Optional[ReportGenerator] = None,
+        session_id: Optional[str] = None,
+        source_type: Optional[str] = None,
+        source_path: Optional[str] = None,
+        model_path: Optional[str] = None,
+        frame_buffer: Optional[FrameBuffer] = None,
+        headless: bool = False,
+        stop_event: Optional[threading.Event] = None
     ):
         self.detector = detector
         self.output_path = output_path
@@ -40,6 +49,17 @@ class VideoProcessor:
         self.road_segmenter = road_segmenter
         self.json_store = json_store
         self.report_gen = report_gen
+        
+        # Session provenance — passed through to storage on every flush
+        self.session_id = session_id
+        self.source_type = source_type
+        self.source_path = source_path
+        self.model_path = model_path
+
+        # Streaming & control
+        self.frame_buffer = frame_buffer
+        self.headless = headless
+        self.stop_event = stop_event
         
         # Ensure output directory exists
         os.makedirs(os.path.dirname(os.path.abspath(self.output_path)), exist_ok=True)
@@ -60,6 +80,11 @@ class VideoProcessor:
         total_detections = 0
         
         for frame_number, timestamp, frame in reader:
+            # Check stop event
+            if self.stop_event and self.stop_event.is_set():
+                logger.info("Pipeline stop requested by user.")
+                break
+
             # 1. Detection
             raw_detections = self.detector.detect(frame, frame_number, timestamp)
             
@@ -118,15 +143,20 @@ class VideoProcessor:
                 overlay = annotated_frame.copy()
                 overlay[road_mask > 0] = (0, 255, 0) # Green for road
                 cv2.addWeighted(overlay, 0.25, annotated_frame, 0.75, 0, annotated_frame)
+
+            # 4. Stream to dashboard via frame buffer
+            if self.frame_buffer:
+                self.frame_buffer.put(annotated_frame)
             
-            # 4. Write and Display
+            # 5. Write output video
             out.write(annotated_frame)
             
-            # Show live feed on display
-            cv2.imshow("RAVEN Live Feed", annotated_frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                logger.info("Live feed stopped by user (pressed 'q').")
-                break
+            # 6. Show on-screen (only when NOT headless)
+            if not self.headless:
+                cv2.imshow("RAVEN Live Feed", annotated_frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    logger.info("Live feed stopped by user (pressed 'q').")
+                    break
                 
             processed_frames += 1
             
@@ -136,18 +166,31 @@ class VideoProcessor:
                 else:
                     logger.info(f"Processed {processed_frames}/{reader.frame_count} frames...")
                     
-                # Flush live data to JSON so dashboard can read it instantly
+                # Flush live data to JSON + DB so dashboard can read it instantly
                 if self.tracker and self.json_store:
                     completed = self.tracker.get_all_completed_events()
                     active = list(self.tracker.active_events.values())
                     all_events = completed + active
                     
-                    self.json_store.save(all_events, model_name="Live Feed")
+                    self.json_store.save(
+                        all_events,
+                        model_name=self.model_path or "Live Feed",
+                        session_id=self.session_id,
+                        source_type=self.source_type,
+                        source_path=self.source_path
+                    )
                     if self.report_gen:
-                        self.report_gen.generate(all_events, processed_frames)
+                        self.report_gen.generate(
+                            all_events,
+                            processed_frames,
+                            session_id=self.session_id,
+                            source_type=self.source_type,
+                            source_path=self.source_path
+                        )
                 
         out.release()
-        cv2.destroyAllWindows()
+        if not self.headless:
+            cv2.destroyAllWindows()
         logger.info(f"Processing complete. {processed_frames} frames processed. "
                     f"{total_detections} total raw detections.")
         

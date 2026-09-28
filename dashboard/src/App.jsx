@@ -4,6 +4,7 @@ import StatusBar from './components/StatusBar';
 import DefectTable from './components/DefectTable';
 import MapViewer from './components/MapViewer';
 import EvidenceViewer from './components/EvidenceViewer';
+import VideoFeed from './components/VideoFeed';
 
 const App = () => {
   const [reportData, setReportData] = useState(null);
@@ -12,6 +13,8 @@ const App = () => {
   const [loading, setLoading] = useState(true);
   const [isLiveRunning, setIsLiveRunning] = useState(false);
   const [filterType, setFilterType] = useState('ALL');
+  const [pipelineStatus, setPipelineStatus] = useState(null);
+  const [showVideoPicker, setShowVideoPicker] = useState(false);
 
   // ===== RESIZER STATE =====
   const [leftWidth, setLeftWidth] = useState(() => parseInt(localStorage.getItem('ravenLeftWidth')) || 400);
@@ -20,7 +23,7 @@ const App = () => {
   const [isResizingTop, setIsResizingTop] = useState(false);
 
   // ===== MODAL STATE =====
-  const [activeModal, setActiveModal] = useState(null); // 'about' | 'shortcuts'
+  const [activeModal, setActiveModal] = useState(null); // 'about' | 'shortcuts' | 'confirm-delete'
 
   useEffect(() => {
     localStorage.setItem('ravenLeftWidth', leftWidth);
@@ -72,11 +75,12 @@ const App = () => {
     }
   }, []);
 
-  const checkLiveStatus = useCallback(async () => {
+  const checkPipelineStatus = useCallback(async () => {
     try {
       const res = await fetch('/api/status');
       if (res.ok) {
         const data = await res.json();
+        setPipelineStatus(data);
         setIsLiveRunning(data.running);
       }
     } catch {
@@ -86,13 +90,13 @@ const App = () => {
 
   useEffect(() => {
     fetchTelemetryData();
-    checkLiveStatus();
+    checkPipelineStatus();
     const interval = setInterval(() => {
-      checkLiveStatus();
+      checkPipelineStatus();
       fetchTelemetryData();
-    }, 5000);
+    }, 3000);
     return () => clearInterval(interval);
-  }, [fetchTelemetryData, checkLiveStatus]);
+  }, [fetchTelemetryData, checkPipelineStatus]);
 
   // ===== FILTERING =====
   const filteredEvents = useMemo(() => {
@@ -104,21 +108,49 @@ const App = () => {
 
   const selectedEvent = events.find(e => e.event_id === selectedEventId);
 
-  // ===== CAMERA CONTROL =====
-  const toggleLiveCamera = useCallback(async () => {
+  // ===== PIPELINE CONTROL =====
+  const startDetection = useCallback(async (videoPath) => {
     try {
-      if (isLiveRunning) {
-        await fetch('/api/live/stop', { method: 'POST' });
-        setIsLiveRunning(false);
-        setTimeout(fetchTelemetryData, 2000);
-      } else {
-        await fetch('/api/live/start', { method: 'POST' });
+      const res = await fetch(`/api/detect/start?video_path=${encodeURIComponent(videoPath)}`, { method: 'POST' });
+      if (res.ok) {
         setIsLiveRunning(true);
+        checkPipelineStatus();
+      } else {
+        const err = await res.json();
+        console.error('Start detection failed:', err);
       }
     } catch (err) {
-      console.error('API Action failed:', err);
+      console.error('Start detection request failed:', err);
     }
-  }, [isLiveRunning, fetchTelemetryData]);
+  }, [checkPipelineStatus]);
+
+  const startLiveCamera = useCallback(async () => {
+    try {
+      const res = await fetch('/api/live/start', { method: 'POST' });
+      if (res.ok) {
+        setIsLiveRunning(true);
+        checkPipelineStatus();
+      } else {
+        const err = await res.json();
+        console.error('Start live failed:', err);
+      }
+    } catch (err) {
+      console.error('Start live request failed:', err);
+    }
+  }, [checkPipelineStatus]);
+
+  const stopPipeline = useCallback(async () => {
+    try {
+      await fetch('/api/detect/stop', { method: 'POST' });
+      setIsLiveRunning(false);
+      setTimeout(() => {
+        fetchTelemetryData();
+        checkPipelineStatus();
+      }, 2000);
+    } catch (err) {
+      console.error('Stop pipeline failed:', err);
+    }
+  }, [fetchTelemetryData, checkPipelineStatus]);
 
   // ===== CSV EXPORT =====
   const exportCSV = useCallback(() => {
@@ -153,6 +185,23 @@ const App = () => {
     URL.revokeObjectURL(url);
   }, [events]);
 
+  // ===== DELETE ALL DATA =====
+  const deleteAllData = useCallback(async () => {
+    try {
+      const res = await fetch('/api/data/purge', { method: 'DELETE' });
+      if (res.ok) {
+        setEvents([]);
+        setReportData(null);
+        setSelectedEventId(null);
+        setActiveModal(null);
+      } else {
+        console.error('Purge failed:', await res.text());
+      }
+    } catch (err) {
+      console.error('Purge request failed:', err);
+    }
+  }, []);
+
   // ===== MENU ACTIONS =====
   const handleMenuAction = useCallback((action) => {
     switch (action) {
@@ -162,7 +211,14 @@ const App = () => {
       case 'filter-all': setFilterType('ALL'); break;
       case 'filter-potholes': setFilterType('CRITICAL'); break;
       case 'filter-cracks': setFilterType('WARNING'); break;
-      case 'toggle-camera': toggleLiveCamera(); break;
+      case 'start-detection':
+        setShowVideoPicker(true);
+        break;
+      case 'start-live': startLiveCamera(); break;
+      case 'stop-pipeline': stopPipeline(); break;
+      case 'delete-all-data':
+        setActiveModal('confirm-delete');
+        break;
       case 'show-shortcuts':
         setActiveModal('shortcuts');
         break;
@@ -171,7 +227,7 @@ const App = () => {
         break;
       default: break;
     }
-  }, [exportCSV, exportJSON, fetchTelemetryData, toggleLiveCamera]);
+  }, [exportCSV, exportJSON, fetchTelemetryData, startLiveCamera, stopPipeline]);
 
   // ===== GLOBAL KEYBOARD SHORTCUTS =====
   useEffect(() => {
@@ -243,8 +299,21 @@ const App = () => {
           onMouseDown={(e) => { e.preventDefault(); setIsResizingLeft(true); }}
         />
 
-        {/* Right: Map */}
+        {/* Right Column: Video Feed + Map */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+
+          {/* Video Feed Panel — always present, shows controls when idle */}
+          <VideoFeed
+            isRunning={isLiveRunning}
+            pipelineStatus={pipelineStatus}
+            onStartDetect={startDetection}
+            onStartLive={startLiveCamera}
+            onStop={stopPipeline}
+            externalShowPicker={showVideoPicker}
+            onPickerClose={() => setShowVideoPicker(false)}
+          />
+
+          {/* Map Panel — always visible below the feed */}
           <div className="mac-window" style={{ flex: 1, display: 'flex', flexDirection: 'column', border: 'none' }}>
             <div className="panel-header"><span>Map</span></div>
             <div style={{ flex: 1, position: 'relative' }}>
@@ -301,6 +370,26 @@ const App = () => {
               </table>
               <div style={{ textAlign: 'center', marginTop: 10 }}>
                 <button className="mac-btn" onClick={() => setActiveModal(null)}>OK</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeModal === 'confirm-delete' && (
+        <div className="modal-overlay" onClick={() => setActiveModal(null)}>
+          <div className="mac-window" style={{ width: 380, boxShadow: '4px 4px 0px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+            <div className="panel-header"><span>Delete All Data</span></div>
+            <div style={{ padding: 20 }}>
+              <div style={{ marginBottom: 12, fontWeight: 'bold' }}>
+                Are you sure you want to delete ALL data?
+              </div>
+              <div style={{ marginBottom: 16, color: 'var(--text-secondary)', fontSize: 11 }}>
+                This will permanently remove all sessions, detections, evidence images, and reports. This action cannot be undone.
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button className="mac-btn" onClick={() => setActiveModal(null)}>Cancel</button>
+                <button className="mac-btn-danger" onClick={deleteAllData}>Delete Everything</button>
               </div>
             </div>
           </div>
