@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import useVideoSocket from '../hooks/useVideoSocket';
 
 const VideoFeed = ({ isRunning, pipelineStatus, onStartDetect, onStartLive, onStop, externalShowPicker, onPickerClose }) => {
   const [videos, setVideos] = useState([]);
@@ -7,8 +8,10 @@ const VideoFeed = ({ isRunning, pipelineStatus, onStartDetect, onStartLive, onSt
   const [starting, setStarting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
-  // Unique key to force browser to reconnect the MJPEG stream on each run
-  const [feedKey, setFeedKey] = useState(0);
+  const canvasRef = useRef(null);
+
+  // WebSocket video feed — replaces MJPEG <img> with canvas rendering
+  useVideoSocket({ canvasRef, enabled: isRunning });
 
   // Sync external picker trigger from menu bar
   useEffect(() => {
@@ -70,13 +73,6 @@ const VideoFeed = ({ isRunning, pipelineStatus, onStartDetect, onStartLive, onSt
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showPicker, videos, selectedVideo, starting, onStartDetect]);
 
-  // Bump feed key when pipeline starts to force a fresh <img> connection
-  useEffect(() => {
-    if (isRunning) {
-      setFeedKey(k => k + 1);
-    }
-  }, [isRunning]);
-
   const handleStartDetect = async () => {
     if (!selectedVideo) return;
     setStarting(true);
@@ -89,13 +85,8 @@ const VideoFeed = ({ isRunning, pipelineStatus, onStartDetect, onStartLive, onSt
     }
   };
 
-  const handleStartLive = async () => {
-    setStarting(true);
-    try {
-      await onStartLive();
-    } finally {
-      setStarting(false);
-    }
+  const handleStartLive = () => {
+    onStartLive();
   };
 
   const handleUpload = async (e) => {
@@ -136,14 +127,16 @@ const VideoFeed = ({ isRunning, pipelineStatus, onStartDetect, onStartLive, onSt
         {/* Toolbar */}
         <div className="toolbar" style={{ justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: 'var(--accent-red)', fontWeight: 'bold', fontSize: 11 }}>PROCESSING</span>
+            <span style={{ color: 'var(--accent-red)', fontWeight: 'bold', fontSize: 11 }}>
+              PROCESSING{pipelineStatus?.source_type === 'live_camera' ? ' LIVE' : ''}
+            </span>
           </div>
           <button className="mac-btn-danger" onClick={onStop} style={{ padding: '2px 12px', fontSize: 11 }}>
             Stop
           </button>
         </div>
 
-        {/* MJPEG Stream */}
+        {/* WebSocket Video Canvas — zero-flicker, double-buffered by browser */}
         <div style={{
           flex: 1,
           background: '#000',
@@ -153,14 +146,13 @@ const VideoFeed = ({ isRunning, pipelineStatus, onStartDetect, onStartLive, onSt
           overflow: 'hidden',
           position: 'relative',
         }}>
-          <img
-            key={feedKey}
-            src={`/api/feed?t=${feedKey}`}
-            alt="RAVEN Feed"
+          <canvas
+            ref={canvasRef}
             style={{
               maxWidth: '100%',
               maxHeight: '100%',
               objectFit: 'contain',
+              transform: pipelineStatus?.source_path === 'camera:0' ? 'scaleX(-1)' : 'none',
             }}
           />
         </div>
@@ -183,10 +175,10 @@ const VideoFeed = ({ isRunning, pipelineStatus, onStartDetect, onStartLive, onSt
         padding: 30,
         background: '#1a1a1a',
       }}>
-        <div style={{ fontSize: 48, opacity: 0.3, fontFamily: 'var(--font-mono)' }}>[ ]</div>
-        <div style={{ color: '#888', textAlign: 'center', maxWidth: 280 }}>
+        <div style={{ color: '#888', fontSize: 48, opacity: 0.3, fontFamily: 'var(--font-mono)' }}>[ ]</div>
+        {/* <div style={{ color: '#888', textAlign: 'center', maxWidth: 280 }}>
           Start a detection pipeline to see the live video feed here.
-        </div>
+        </div> */}
 
         <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
           <button className="mac-btn" onClick={() => setShowPicker(true)}

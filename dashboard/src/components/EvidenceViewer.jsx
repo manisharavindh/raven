@@ -21,7 +21,7 @@ const EvidenceViewer = ({ event }) => {
   }, [isModalOpen, event]);
 
   const copyCoords = () => {
-    if (!event) return;
+    if (!event || event.latitude == null) return;
     navigator.clipboard.writeText(`${event.latitude.toFixed(6)}, ${event.longitude.toFixed(6)}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -97,7 +97,7 @@ const EvidenceViewer = ({ event }) => {
             <div className="evidence-meta-row">
               <span className="evidence-meta-label">Coordinates</span>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>
-                {event.latitude.toFixed(6)}, {event.longitude.toFixed(6)}
+                {event.latitude != null ? `${event.latitude.toFixed(6)}, ${event.longitude.toFixed(6)}` : 'N/A'}
               </span>
               <button className="copy-btn" onClick={copyCoords} title="Copy to clipboard">
                 {copied ? <><Check size={10} /> Copied</> : <><Copy size={10} /> Copy</>}

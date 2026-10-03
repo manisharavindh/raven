@@ -26,6 +26,7 @@ class VideoReader:
         self.frame_count = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
         if self.frame_count <= 0:
+            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             logger.info(f"Opened live camera {source}: {self.width}x{self.height} @ ~{self.fps}fps")
         else:
             logger.info(f"Opened video {source}: {self.width}x{self.height} @ {self.fps}fps ({self.frame_count} frames)")

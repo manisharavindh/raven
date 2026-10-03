@@ -166,7 +166,11 @@ class VideoProcessor:
                 else:
                     logger.info(f"Processed {processed_frames}/{reader.frame_count} frames...")
                     
-                # Flush live data to JSON + DB so dashboard can read it instantly
+            # Flush live data to JSON + DB so dashboard can read it instantly
+            is_live = (self.source_type == "live_camera" or reader.frame_count <= 0)
+            flush_interval = 1 if is_live else 30
+            
+            if processed_frames % flush_interval == 0:
                 if self.tracker and self.json_store:
                     completed = self.tracker.get_all_completed_events()
                     active = list(self.tracker.active_events.values())

@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import MenuBar from './components/MenuBar';
 import StatusBar from './components/StatusBar';
 import DefectTable from './components/DefectTable';
 import MapViewer from './components/MapViewer';
 import EvidenceViewer from './components/EvidenceViewer';
 import VideoFeed from './components/VideoFeed';
+import useTelemetrySocket from './hooks/useTelemetrySocket';
 
 const App = () => {
   const [reportData, setReportData] = useState(null);
@@ -19,16 +20,20 @@ const App = () => {
   // ===== RESIZER STATE =====
   const [leftWidth, setLeftWidth] = useState(() => parseInt(localStorage.getItem('ravenLeftWidth')) || 400);
   const [leftTopHeight, setLeftTopHeight] = useState(() => parseInt(localStorage.getItem('ravenLeftTopHeight')) || window.innerHeight / 2);
+  const [rightTopHeight, setRightTopHeight] = useState(() => parseInt(localStorage.getItem('ravenRightTopHeight')) || window.innerHeight / 2);
   const [isResizingLeft, setIsResizingLeft] = useState(false);
   const [isResizingTop, setIsResizingTop] = useState(false);
+  const [isResizingRightTop, setIsResizingRightTop] = useState(false);
 
   // ===== MODAL STATE =====
-  const [activeModal, setActiveModal] = useState(null); // 'about' | 'shortcuts' | 'confirm-delete'
+  const [activeModal, setActiveModal] = useState(null); // 'about' | 'shortcuts' | 'confirm-delete' | 'camera-picker'
+  const [cameraInput, setCameraInput] = useState('0');
 
   useEffect(() => {
     localStorage.setItem('ravenLeftWidth', leftWidth);
     localStorage.setItem('ravenLeftTopHeight', leftTopHeight);
-  }, [leftWidth, leftTopHeight]);
+    localStorage.setItem('ravenRightTopHeight', rightTopHeight);
+  }, [leftWidth, leftTopHeight, rightTopHeight]);
 
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -38,13 +43,17 @@ const App = () => {
       if (isResizingTop) {
         setLeftTopHeight(Math.max(100, Math.min(e.clientY - 22, window.innerHeight - 150)));
       }
+      if (isResizingRightTop) {
+        setRightTopHeight(Math.max(200, Math.min(e.clientY - 22, window.innerHeight - 150)));
+      }
     };
     const handleMouseUp = () => {
       setIsResizingLeft(false);
       setIsResizingTop(false);
+      setIsResizingRightTop(false);
     };
 
-    if (isResizingLeft || isResizingTop) {
+    if (isResizingLeft || isResizingTop || isResizingRightTop) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
       // Prevent text selection while dragging
@@ -57,9 +66,36 @@ const App = () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizingLeft, isResizingTop]);
+  }, [isResizingLeft, isResizingTop, isResizingRightTop]);
 
-  // ===== DATA FETCHING =====
+  // ===== REAL-TIME TELEMETRY via WebSocket =====
+  // Replaces the old 500ms HTTP polling loop. The server now pushes
+  // only changed data over a persistent WebSocket connection.
+  // Falls back to HTTP polling automatically if WebSocket fails.
+
+  const handleDetections = useCallback((newDetections) => {
+    setEvents(newDetections);
+    setLoading(false);
+  }, []);
+
+  const handleReport = useCallback((newReport) => {
+    setReportData(newReport);
+    setLoading(false);
+  }, []);
+
+  const handleStatus = useCallback((newStatus) => {
+    setPipelineStatus(newStatus);
+    setIsLiveRunning(newStatus.running);
+    setLoading(false);
+  }, []);
+
+  useTelemetrySocket({
+    onDetections: handleDetections,
+    onReport: handleReport,
+    onStatus: handleStatus,
+  });
+
+  // Manual refresh for menu action — triggers a one-shot HTTP fetch
   const fetchTelemetryData = useCallback(async () => {
     try {
       const [reportRes, detectionsRes] = await Promise.all([
@@ -70,8 +106,6 @@ const App = () => {
       if (detectionsRes.ok) setEvents(await detectionsRes.json());
     } catch (err) {
       console.error('Failed to load RAVEN data:', err);
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -87,16 +121,6 @@ const App = () => {
       // API not reachable
     }
   }, []);
-
-  useEffect(() => {
-    fetchTelemetryData();
-    checkPipelineStatus();
-    const interval = setInterval(() => {
-      checkPipelineStatus();
-      fetchTelemetryData();
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [fetchTelemetryData, checkPipelineStatus]);
 
   // ===== FILTERING =====
   const filteredEvents = useMemo(() => {
@@ -124,9 +148,9 @@ const App = () => {
     }
   }, [checkPipelineStatus]);
 
-  const startLiveCamera = useCallback(async () => {
+  const startLiveCamera = useCallback(async (camId = 0) => {
     try {
-      const res = await fetch('/api/live/start', { method: 'POST' });
+      const res = await fetch(`/api/live/start?camera=${encodeURIComponent(camId)}`, { method: 'POST' });
       if (res.ok) {
         setIsLiveRunning(true);
         checkPipelineStatus();
@@ -214,7 +238,9 @@ const App = () => {
       case 'start-detection':
         setShowVideoPicker(true);
         break;
-      case 'start-live': startLiveCamera(); break;
+      case 'start-live': 
+        setActiveModal('camera-picker');
+        break;
       case 'stop-pipeline': stopPipeline(); break;
       case 'delete-all-data':
         setActiveModal('confirm-delete');
@@ -244,18 +270,26 @@ const App = () => {
   // ===== LOADING STATE =====
   if (loading && !events.length) {
     return (
-      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-main)' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 8, color: 'white' }}>RAVEN</div>
-          <div style={{ color: 'white' }}>Initializing...</div>
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-main)', backgroundColor: 'var(--mac-desktop)' }}>
+        <div style={{ textAlign: 'center', animation: 'pulse 2s infinite' }}>
+          <img src="/favicon.svg" alt="RAVEN" style={{ width: 80, height: 80, marginBottom: 20, dropShadow: '0 4px 6px rgba(0,0,0,0.5)' }} />
+          <div style={{ fontSize: 28, fontWeight: 'bold', marginBottom: 8, color: 'white', textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}>RAVEN</div>
+          <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 14 }}>Initializing System...</div>
         </div>
+        <style>{`
+          @keyframes pulse {
+            0% { opacity: 0.8; transform: scale(0.98); }
+            50% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0.8; transform: scale(0.98); }
+          }
+        `}</style>
       </div>
     );
   }
 
   // ===== MAIN LAYOUT =====
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', cursor: isResizingLeft ? 'col-resize' : isResizingTop ? 'row-resize' : 'default' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', cursor: isResizingLeft ? 'col-resize' : (isResizingTop || isResizingRightTop) ? 'row-resize' : 'default' }}>
 
       {/* Menu Bar */}
       <MenuBar
@@ -303,14 +337,22 @@ const App = () => {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
 
           {/* Video Feed Panel — always present, shows controls when idle */}
-          <VideoFeed
-            isRunning={isLiveRunning}
-            pipelineStatus={pipelineStatus}
-            onStartDetect={startDetection}
-            onStartLive={startLiveCamera}
-            onStop={stopPipeline}
-            externalShowPicker={showVideoPicker}
-            onPickerClose={() => setShowVideoPicker(false)}
+          <div style={{ height: rightTopHeight, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+            <VideoFeed
+              isRunning={isLiveRunning}
+              pipelineStatus={pipelineStatus}
+              onStartDetect={startDetection}
+              onStartLive={() => setActiveModal('camera-picker')}
+              onStop={stopPipeline}
+              externalShowPicker={showVideoPicker}
+              onPickerClose={() => setShowVideoPicker(false)}
+            />
+          </div>
+
+          {/* Horizontal Resizer */}
+          <div 
+            className={`resizer-v ${isResizingRightTop ? 'active' : ''}`}
+            onMouseDown={(e) => { e.preventDefault(); setIsResizingRightTop(true); }}
           />
 
           {/* Map Panel — always visible below the feed */}
@@ -390,6 +432,40 @@ const App = () => {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                 <button className="mac-btn" onClick={() => setActiveModal(null)}>Cancel</button>
                 <button className="mac-btn-danger" onClick={deleteAllData}>Delete Everything</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeModal === 'camera-picker' && (
+        <div className="modal-overlay" onClick={() => setActiveModal(null)}>
+          <div className="mac-window" style={{ width: 300, boxShadow: '4px 4px 0px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+            <div className="panel-header"><span>Select Camera</span></div>
+            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                Enter camera index (e.g., 0 for default, 1 for external):
+              </div>
+              <input
+                type="number"
+                min="0"
+                value={cameraInput}
+                onChange={(e) => setCameraInput(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box' }}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setActiveModal(null);
+                    startLiveCamera(parseInt(cameraInput, 10) || 0);
+                  }
+                }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
+                <button className="mac-btn" onClick={() => setActiveModal(null)}>Cancel</button>
+                <button className="mac-btn" onClick={() => {
+                  setActiveModal(null);
+                  startLiveCamera(parseInt(cameraInput, 10) || 0);
+                }}>Start</button>
               </div>
             </div>
           </div>

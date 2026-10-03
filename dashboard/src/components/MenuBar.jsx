@@ -83,11 +83,6 @@ const MenuBar = ({ onAction, isLiveRunning, filterType }) => {
       ))}
 
       <div style={{ flex: 1 }} />
-      {isLiveRunning && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginRight: 8 }}>
-          <span style={{ color: 'var(--accent-red)', fontWeight: 'bold', fontSize: 11 }}>LIVE</span>
-        </div>
-      )}
       <div style={{ fontWeight: 'bold', paddingRight: 8 }}>RAVEN</div>
     </div>
   );

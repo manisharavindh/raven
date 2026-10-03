@@ -140,9 +140,9 @@ const DefectTable = ({ events, selectedId, onSelect, onRefresh }) => {
           placeholder="Search defects... (F)"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          style={{ flex: 1, maxWidth: 250 }}
+          style={{ flex: 1 }}
         />
-        <span style={{ color: 'var(--text-secondary)', marginLeft: 'auto', fontSize: 11 }}>
+        <span style={{ color: 'var(--text-secondary)', marginLeft: '12px', fontSize: 11, whiteSpace: 'nowrap' }}>
           {filteredAndSorted.length} of {events.length} defects
         </span>
       </div>
@@ -152,26 +152,25 @@ const DefectTable = ({ events, selectedId, onSelect, onRefresh }) => {
         <table className="defect-table">
           <thead>
             <tr>
-              <th style={{ width: '15%' }} onClick={() => handleSort('event_id')}>
+              <th style={{ width: '20%' }} onClick={() => handleSort('event_id')}>
                 ID<span className="sort-arrow">{sortArrow('event_id')}</span>
               </th>
-              <th style={{ width: '15%' }} onClick={() => handleSort('timestamp')}>
+              <th style={{ width: '20%' }} onClick={() => handleSort('timestamp')}>
                 Time<span className="sort-arrow">{sortArrow('timestamp')}</span>
               </th>
-              <th style={{ width: '18%' }} onClick={() => handleSort('type')}>
+              <th style={{ width: '20%' }} onClick={() => handleSort('type')}>
                 Type<span className="sort-arrow">{sortArrow('type')}</span>
               </th>
-              <th style={{ width: '22%' }} onClick={() => handleSort('confidence')}>
+              <th style={{ width: '20%' }} onClick={() => handleSort('confidence')}>
                 Conf<span className="sort-arrow">{sortArrow('confidence')}</span>
               </th>
-              <th style={{ width: '15%' }}>Loc</th>
-              <th style={{ width: '15%' }}>Actions</th>
+              <th style={{ width: '20%' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredAndSorted.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)' }}>
+                <td colSpan={5} style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)' }}>
                   {events.length === 0 ? 'No defects detected.' : 'No results match your search.'}
                 </td>
               </tr>
@@ -187,10 +186,17 @@ const DefectTable = ({ events, selectedId, onSelect, onRefresh }) => {
                     style={{ opacity: isCleared ? 0.5 : 1 }}
                   >
                     <td style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>{event.event_id}</td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>{(event.timestamp || 0).toFixed(1)}s</td>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>
+                      {(() => {
+                        const d = new Date();
+                        d.setHours(9, 0, 0, 0);
+                        d.setSeconds(event.timestamp || 0);
+                        return d.toLocaleTimeString('en-US', { hour12: false });
+                      })()}
+                    </td>
                     <td>
                       <span className={`badge ${isCritical(event.type) ? 'badge-critical' : 'badge-warning'}`}>
-                        {event.type.toUpperCase()}
+                        {event.type.toUpperCase() === 'POTHOLE' ? 'PTHL' : (event.type.toUpperCase() === 'CRACK' ? 'CRK' : event.type.toUpperCase())}
                       </span>
                     </td>
                     <td>
@@ -204,9 +210,6 @@ const DefectTable = ({ events, selectedId, onSelect, onRefresh }) => {
                         />
                       </span>
                       {(event.confidence * 100).toFixed(0)}%
-                    </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>
-                      {event.latitude ? `${event.latitude.toFixed(2)},${event.longitude.toFixed(2)}` : 'N/A'}
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query, UploadFile, File
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
@@ -8,6 +8,7 @@ import glob
 import time
 import threading
 import logging
+import asyncio
 from typing import Optional
 
 from src.raven.config import load_config
@@ -502,3 +503,164 @@ async def clear_event(event_id: str):
     if not updated:
         raise HTTPException(404, "Event not found")
     return {"status": "cleared"}
+
+
+# ================================================================== #
+#  WebSocket: Real-time Telemetry
+# ================================================================== #
+
+@app.websocket("/ws/telemetry")
+async def ws_telemetry(websocket: WebSocket):
+    """
+    Push telemetry data (detections, report, pipeline status) to the
+    dashboard in real time. Replaces the 500ms HTTP polling loop.
+
+    The server sends JSON messages of the form:
+        { "type": "telemetry", "detections": [...], "report": {...}, "status": {...} }
+
+    Only sends when data has actually changed, minimizing bandwidth.
+    """
+    await websocket.accept()
+    logger.info("WebSocket telemetry client connected")
+
+    last_detections_hash = None
+    last_report_hash = None
+    last_status_hash = None
+
+    try:
+        while True:
+            # Build current telemetry snapshot
+            detections_payload = []
+            report_payload = {}
+            status_payload = {
+                "running": pipeline.is_running,
+                "status": pipeline.status,
+                "source_type": pipeline.source_type,
+                "source_path": pipeline.source_path,
+                "session_id": pipeline.session_id,
+                "frames_processed": pipeline.frames_processed,
+                "detections_count": pipeline.detections_count,
+                "error": pipeline.error,
+            }
+
+            # Detections
+            try:
+                detections = db.get_latest_detections()
+                if detections:
+                    detections_payload = [
+                        {
+                            "event_id": d["event_id"],
+                            "type": d["class_name"],
+                            "confidence": d["confidence"],
+                            "first_frame": d["first_frame"],
+                            "last_frame": d["last_frame"],
+                            "latitude": d["latitude"],
+                            "longitude": d["longitude"],
+                            "evidence": d["evidence_path"],
+                            "status": d["status"],
+                            "model": d["model_path"],
+                            "source_type": d["source_type"],
+                            "source_path": d["source_path"],
+                            "detected_at": d["detected_at"],
+                        }
+                        for d in detections
+                    ]
+                else:
+                    try:
+                        with open("data/exports/detections.json", "r") as f:
+                            detections_payload = json.load(f)
+                    except (FileNotFoundError, json.JSONDecodeError):
+                        detections_payload = []
+            except Exception:
+                detections_payload = []
+
+            # Report
+            try:
+                report = db.get_latest_report()
+                if report:
+                    report_payload = report
+                else:
+                    with open("data/exports/report.json", "r") as f:
+                        report_payload = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                report_payload = {}
+
+            # Check what changed
+            det_hash = json.dumps(detections_payload, sort_keys=True)
+            rep_hash = json.dumps(report_payload, sort_keys=True, default=str)
+            stat_hash = json.dumps(status_payload, sort_keys=True)
+
+            changes = {}
+            if det_hash != last_detections_hash:
+                changes["detections"] = detections_payload
+                last_detections_hash = det_hash
+            if rep_hash != last_report_hash:
+                changes["report"] = report_payload
+                last_report_hash = rep_hash
+            if stat_hash != last_status_hash:
+                changes["status"] = status_payload
+                last_status_hash = stat_hash
+
+            if changes:
+                changes["type"] = "telemetry"
+                await websocket.send_json(changes)
+
+            # When pipeline is running, push faster for real-time feel
+            interval = 0.3 if pipeline.is_running else 1.0
+            await asyncio.sleep(interval)
+
+    except WebSocketDisconnect:
+        logger.info("WebSocket telemetry client disconnected")
+    except Exception as e:
+        logger.error(f"WebSocket telemetry error: {e}")
+        try:
+            await websocket.close()
+        except Exception:
+            pass
+
+
+# ================================================================== #
+#  WebSocket: Real-time Video Feed (Binary Frames)
+# ================================================================== #
+
+@app.websocket("/ws/feed")
+async def ws_video_feed(websocket: WebSocket):
+    """
+    Push annotated video frames as binary JPEG data over WebSocket.
+    
+    Much more efficient than MJPEG:
+    - No HTTP overhead per frame
+    - Client controls backpressure naturally
+    - Binary frames = smaller payload than base64
+    - WebSocket compression can be negotiated
+    
+    The client renders frames to a <canvas> element for zero-flicker display.
+    """
+    await websocket.accept()
+    logger.info("WebSocket video feed client connected")
+
+    try:
+        while True:
+            if not pipeline.is_running:
+                # Send a status message so client knows pipeline stopped
+                await websocket.send_json({"type": "status", "running": False})
+                await asyncio.sleep(1.0)
+                continue
+
+            # get_jpeg blocks on threading.Event, so we MUST run it in a threadpool
+            # otherwise it freezes the FastAPI asyncio event loop!
+            jpeg = await asyncio.to_thread(pipeline.frame_buffer.get_jpeg, 75)
+            if jpeg:
+                # Send binary frame directly — no base64 encoding overhead
+                await websocket.send_bytes(jpeg)
+            else:
+                await asyncio.sleep(0.016)  # ~60fps max poll rate
+
+    except WebSocketDisconnect:
+        logger.info("WebSocket video feed client disconnected")
+    except Exception as e:
+        logger.error(f"WebSocket video feed error: {e}")
+        try:
+            await websocket.close()
+        except Exception:
+            pass
