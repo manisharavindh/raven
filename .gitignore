@@ -218,6 +218,11 @@ data/input/*
 data/exports/*
 !data/exports/.gitkeep
 
+data/maps/*
+!data/maps/.gitkeep
+
+cache/
+
 # Ensure legacy data paths are ignored
 dashboard/public/data/*
 !dashboard/public/data/.gitkeep

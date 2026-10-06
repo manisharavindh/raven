@@ -268,24 +268,7 @@ const App = () => {
   }, []);
 
   // ===== LOADING STATE =====
-  if (loading && !events.length) {
-    return (
-      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-main)', backgroundColor: 'var(--mac-desktop)' }}>
-        <div style={{ textAlign: 'center', animation: 'pulse 2s infinite' }}>
-          <img src="/favicon.svg" alt="RAVEN" style={{ width: 80, height: 80, marginBottom: 20, dropShadow: '0 4px 6px rgba(0,0,0,0.5)' }} />
-          <div style={{ fontSize: 28, fontWeight: 'bold', marginBottom: 8, color: 'white', textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}>RAVEN</div>
-          <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 14 }}>Initializing System...</div>
-        </div>
-        <style>{`
-          @keyframes pulse {
-            0% { opacity: 0.8; transform: scale(0.98); }
-            50% { opacity: 1; transform: scale(1); }
-            100% { opacity: 0.8; transform: scale(0.98); }
-          }
-        `}</style>
-      </div>
-    );
-  }
+  // Loading screen removed as requested
 
   // ===== MAIN LAYOUT =====
   return (

@@ -138,7 +138,7 @@ class PipelineRunner:
                 max_disappeared=config.tracking.max_disappeared,
                 iou_threshold=config.tracking.iou_threshold,
             )
-            gps_provider = SimulatedGPSProvider(config.gps.simulated_route)
+            gps_provider = SimulatedGPSProvider(config.gps.model_dump())
             evidence_capture = EvidenceCapture(config.output.evidence_dir)
             json_store = JSONStore(config.output.detections_json, db=run_db)
             report_gen = ReportGenerator(config.output.report_json, db=run_db)
@@ -381,6 +381,8 @@ async def get_detections():
                     "source_type": d["source_type"],
                     "source_path": d["source_path"],
                     "detected_at": d["detected_at"],
+                    "road_id": json.loads(d["extra"]).get("road_id") if d.get("extra") else None,
+                    "road_name": json.loads(d["extra"]).get("road_name") if d.get("extra") else None,
                 }
                 for d in detections
             ]
@@ -430,6 +432,122 @@ async def purge_all_data():
     if errors:
         return {"status": "partial", "errors": errors}
     return {"status": "purged"}
+
+# ================================================================== #
+#  Map & GeoJSON endpoints
+# ================================================================== #
+
+map_network = None
+
+@app.get("/api/map/roads")
+async def get_map_roads():
+    global map_network
+    if map_network is None:
+        try:
+            from src.raven.geolocation.road_network import RoadNetwork
+            map_network = RoadNetwork()
+        except Exception as e:
+            logger.error(f"Failed to load map network: {e}")
+            raise HTTPException(500, "Failed to load road geometry")
+            
+    detections = db.get_latest_detections()
+    
+    # Hook up map matcher for real GPS data (if road_id is missing)
+    map_matcher = None
+    
+    roads = {}
+    for d in detections:
+        extra = json.loads(d["extra"]) if d.get("extra") else {}
+        road_id = extra.get("road_id")
+        # If no road_id, OR if it's an old OSM Way ID (no dash), use MapMatcher
+        if not road_id or "-" not in str(road_id):
+            if map_matcher is None:
+                from src.raven.geolocation.map_matcher import MapMatcher
+                map_matcher = MapMatcher(map_network)
+            
+            # 15m threshold for map matching as requested
+            road_id = map_matcher.get_nearest_edge(d["latitude"], d["longitude"], max_distance_meters=15.0)
+            
+            if not road_id:
+                # Unmatched detection, skip for road damage layer
+                continue
+            
+        if road_id not in roads:
+            roads[road_id] = {
+                "road_name": extra.get("road_name") or "Unknown Road",
+                "detection_count": 0,
+                "confidence_sum": 0.0,
+                "severity_sum": 0.0,
+                "event_ids": []
+            }
+            
+        roads[road_id]["detection_count"] += 1
+        roads[road_id]["confidence_sum"] += d["confidence"]
+        roads[road_id]["event_ids"].append(d["event_id"])
+        
+        # Severity weights: low=1, medium=2, high=3, critical=4
+        if d["class_name"].lower() == "pothole":
+            weight = 4
+        elif d["class_name"].lower().startswith("crack"):
+            weight = 2
+        else:
+            weight = 1
+            
+        roads[road_id]["severity_sum"] += weight
+        
+    features = []
+    if map_network.edges is not None:
+        from src.raven.geolocation.map_matcher import subdivide_edge
+        from shapely.geometry import mapping
+        
+        for road_id, stats in roads.items():
+            avg_conf = stats["confidence_sum"] / stats["detection_count"]
+            # density approximation: detection_count
+            raw_score = stats["detection_count"] * avg_conf * (stats["severity_sum"] / stats["detection_count"])
+            # normalized to 0-1
+            damage_score = min(1.0, raw_score / 15.0)
+            
+            if damage_score < 0.2: damage_level = "healthy"
+            elif damage_score < 0.4: damage_level = "low"
+            elif damage_score < 0.6: damage_level = "moderate"
+            elif damage_score < 0.8: damage_level = "high"
+            else: damage_level = "severe"
+            
+            try:
+                # Parse u-v
+                if "-" in str(road_id):
+                    parts = str(road_id).split("-")
+                    if len(parts) >= 2:
+                        u, v = int(parts[0]), int(parts[1])
+                        
+                        # Iterate through all keys (parallel edges) between u and v
+                        # In osmnx MultiDiGraph, loc[(u, v)] returns a DataFrame of all keys
+                        try:
+                            edges_df = map_network.edges.loc[(u, v)]
+                            for key, edge_data in edges_df.iterrows():
+                                geom = edge_data.get("geometry")
+                                if geom is not None:
+                                    features.append({
+                                        "type": "Feature",
+                                        "properties": {
+                                            "road_id": str(road_id),
+                                            "road_name": stats["road_name"],
+                                            "damage_score": damage_score,
+                                            "damage_level": damage_level,
+                                            "detection_count": stats["detection_count"],
+                                            "event_ids": stats["event_ids"]
+                                        },
+                                        "geometry": mapping(geom)
+                                    })
+                        except KeyError:
+                            pass
+            except Exception as e:
+                logger.error(f"Error extracting geometry for {road_id}: {e}")
+                
+    return {
+        "type": "FeatureCollection",
+        "features": features
+    }
 
 
 # ================================================================== #
@@ -562,6 +680,8 @@ async def ws_telemetry(websocket: WebSocket):
                             "source_type": d["source_type"],
                             "source_path": d["source_path"],
                             "detected_at": d["detected_at"],
+                            "road_id": json.loads(d["extra"]).get("road_id") if d.get("extra") else None,
+                            "road_name": json.loads(d["extra"]).get("road_name") if d.get("extra") else None,
                         }
                         for d in detections
                     ]

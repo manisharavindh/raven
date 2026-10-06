@@ -13,7 +13,23 @@ output:
   report_json: "data/exports/report.json"
 
 gps:
-  simulated_route: "data/simulated/route.json"
+  source: "synthetic_road"
+  simulation:
+    city: "Coimbatore, Tamil Nadu, India"
+    country: "India"
+    seed: 42
+  sampling_interval_seconds: 1.0
+  speed:
+    min_kmh: 20
+    max_kmh: 50
+  noise:
+    enabled: true
+    standard_deviation_meters: 2.0
+    max_offset_meters: 5.0
+  road_network:
+    provider: "openstreetmap"
+    vehicle_network_type: "drive"
+    cache_path: "data/maps/coimbatore_roads.graphml"
 
 tracking:
   max_disappeared: 10

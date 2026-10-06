@@ -92,7 +92,7 @@ def main():
             max_disappeared=config.tracking.max_disappeared, 
             iou_threshold=config.tracking.iou_threshold
         )
-        gps_provider = SimulatedGPSProvider(config.gps.simulated_route)
+        gps_provider = SimulatedGPSProvider(config.gps.model_dump())
         evidence_capture = EvidenceCapture(config.output.evidence_dir)
         
     road_segmenter = RoadSegmenter()

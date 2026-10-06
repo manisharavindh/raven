@@ -212,6 +212,14 @@ class RavenDatabase:
             for event in events:
                 # Support both TrackedEvent objects and plain dicts
                 if hasattr(event, "event_id"):
+                    extra_data = {}
+                    if event.gps_position:
+                        extra_data = {
+                            "road_id": event.gps_position.road_id,
+                            "road_name": event.gps_position.road_name,
+                            "city": event.gps_position.city,
+                        }
+                    
                     row = (
                         session_id,
                         event.event_id,
@@ -227,10 +235,15 @@ class RavenDatabase:
                         source_type,
                         source_path,
                         model_path,
-                        None
+                        json.dumps(extra_data)
                     )
                 else:
                     # Dict form (e.g. from JSON)
+                    extra_data = {
+                        "road_id": event.get("road_id"),
+                        "road_name": event.get("road_name"),
+                        "city": event.get("city")
+                    }
                     row = (
                         session_id,
                         event.get("event_id", ""),
@@ -246,7 +259,7 @@ class RavenDatabase:
                         source_type,
                         source_path,
                         model_path,
-                        None
+                        json.dumps(extra_data)
                     )
 
                 conn.execute(

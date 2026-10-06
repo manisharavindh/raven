@@ -6,6 +6,13 @@ from src.raven.detection.schemas import BoundingBox
 class GPSPosition(BaseModel):
     latitude: float
     longitude: float
+    timestamp: Optional[float] = None
+    speed_kmh: Optional[float] = None
+    heading: Optional[float] = None
+    road_id: Optional[str] = None
+    road_name: Optional[str] = None
+    route_position: Optional[float] = None
+    city: Optional[str] = None
 
 class TrackedEvent(BaseModel):
     event_id: str
