@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import MenuBar from './components/MenuBar';
 import StatusBar from './components/StatusBar';
 import DefectTable from './components/DefectTable';
@@ -17,6 +18,13 @@ const App = () => {
   const [datasetMode, setDatasetMode] = useState('live'); // 'live' | 'demo'
   const [pipelineStatus, setPipelineStatus] = useState(null);
   const [showVideoPicker, setShowVideoPicker] = useState(false);
+  const [maximizedWindow, setMaximizedWindow] = useState(null);
+
+  // ===== MAP STATE =====
+  const [mapMode, setMapMode] = useState('roads');
+  const [damageViewEnabled, setDamageViewEnabled] = useState(false);
+  const [showRanking, setShowRanking] = useState(false);
+  const [debugAlignment, setDebugAlignment] = useState(false);
 
   // ===== RESIZER STATE =====
   const [leftWidth, setLeftWidth] = useState(() => parseInt(localStorage.getItem('ravenLeftWidth')) || 400);
@@ -269,6 +277,11 @@ const App = () => {
       case 'filter-all': setFilterType('ALL'); break;
       case 'filter-potholes': setFilterType('CRITICAL'); break;
       case 'filter-cracks': setFilterType('WARNING'); break;
+      case 'map-mode-points': setMapMode('points'); break;
+      case 'map-mode-roads': setMapMode('roads'); break;
+      case 'map-toggle-damage': setDamageViewEnabled(prev => !prev); break;
+      case 'map-toggle-ranking': setShowRanking(prev => !prev); break;
+      case 'map-toggle-debug': setDebugAlignment(prev => !prev); break;
       case 'start-detection':
         setShowVideoPicker(true);
         break;
@@ -314,48 +327,40 @@ const App = () => {
         isLiveRunning={isLiveRunning}
         filterType={filterType}
         datasetMode={datasetMode}
+        mapMode={mapMode}
+        damageViewEnabled={damageViewEnabled}
+        showRanking={showRanking}
+        debugAlignment={debugAlignment}
       />
 
       {/* Main Content */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
-        {/* Left Column */}
-        <div style={{ width: leftWidth, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-          
-          {/* Top Left: Defect Table */}
-          <div style={{ height: leftTopHeight, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+        {maximizedWindow === 'defect-table' && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
             <DefectTable
               events={filteredEvents}
               selectedId={selectedEventId}
               onSelect={setSelectedEventId}
               onRefresh={fetchTelemetryData}
+              isMaximized={true}
+              onMaximize={() => setMaximizedWindow(null)}
             />
           </div>
+        )}
 
-          {/* Horizontal Resizer */}
-          <div 
-            className={`resizer-v ${isResizingTop ? 'active' : ''}`}
-            onMouseDown={(e) => { e.preventDefault(); setIsResizingTop(true); }}
-          />
-
-          {/* Bottom Left: Evidence */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <EvidenceViewer event={selectedEvent} />
+        {maximizedWindow === 'evidence' && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <EvidenceViewer 
+              event={selectedEvent} 
+              isMaximized={true}
+              onMaximize={() => setMaximizedWindow(null)}
+            />
           </div>
+        )}
 
-        </div>
-
-        {/* Vertical Resizer */}
-        <div 
-          className={`resizer-h ${isResizingLeft ? 'active' : ''}`}
-          onMouseDown={(e) => { e.preventDefault(); setIsResizingLeft(true); }}
-        />
-
-        {/* Right Column: Video Feed + Map */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-
-          {/* Video Feed Panel — always present, shows controls when idle */}
-          <div style={{ height: rightTopHeight, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+        {maximizedWindow === 'video' && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
             <VideoFeed
               isRunning={isLiveRunning}
               pipelineStatus={pipelineStatus}
@@ -364,29 +369,131 @@ const App = () => {
               onStop={stopPipeline}
               externalShowPicker={showVideoPicker}
               onPickerClose={() => setShowVideoPicker(false)}
+              isMaximized={true}
+              onMaximize={() => setMaximizedWindow(null)}
             />
           </div>
+        )}
 
-          {/* Horizontal Resizer */}
-          <div 
-            className={`resizer-v ${isResizingRightTop ? 'active' : ''}`}
-            onMouseDown={(e) => { e.preventDefault(); setIsResizingRightTop(true); }}
-          />
-
-          {/* Map Panel — always visible below the feed */}
+        {maximizedWindow === 'map' && (
           <div className="mac-window" style={{ flex: 1, display: 'flex', flexDirection: 'column', border: 'none' }}>
-            <div className="panel-header"><span>Map</span></div>
+            <div className="panel-header">
+              <span>Map</span>
+              <button 
+                onClick={() => setMaximizedWindow(null)} 
+                style={{ position: 'absolute', right: 4, background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}
+                title="Restore"
+              >
+                <Minimize2 size={12} />
+              </button>
+            </div>
             <div style={{ flex: 1, position: 'relative' }}>
               <MapViewer
                 events={filteredEvents}
                 selectedId={selectedEventId}
                 onSelect={setSelectedEventId}
                 datasetMode={datasetMode}
+                mapMode={mapMode}
+                damageViewEnabled={damageViewEnabled}
+                showRanking={showRanking}
+                debugAlignment={debugAlignment}
               />
             </div>
           </div>
-        </div>
+        )}
 
+        {!maximizedWindow && (
+          <>
+            {/* Left Column */}
+            <div style={{ width: leftWidth, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+              
+              {/* Top Left: Defect Table */}
+              <div style={{ height: leftTopHeight, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+                <DefectTable
+                  events={filteredEvents}
+                  selectedId={selectedEventId}
+                  onSelect={setSelectedEventId}
+                  onRefresh={fetchTelemetryData}
+                  isMaximized={false}
+                  onMaximize={() => setMaximizedWindow('defect-table')}
+                />
+              </div>
+
+              {/* Horizontal Resizer */}
+              <div 
+                className={`resizer-v ${isResizingTop ? 'active' : ''}`}
+                onMouseDown={(e) => { e.preventDefault(); setIsResizingTop(true); }}
+              />
+
+              {/* Bottom Left: Evidence */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <EvidenceViewer 
+                  event={selectedEvent} 
+                  isMaximized={false}
+                  onMaximize={() => setMaximizedWindow('evidence')}
+                />
+              </div>
+
+            </div>
+
+            {/* Vertical Resizer */}
+            <div 
+              className={`resizer-h ${isResizingLeft ? 'active' : ''}`}
+              onMouseDown={(e) => { e.preventDefault(); setIsResizingLeft(true); }}
+            />
+
+            {/* Right Column: Video Feed + Map */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+
+              {/* Video Feed Panel — always present, shows controls when idle */}
+              <div style={{ height: rightTopHeight, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+                <VideoFeed
+                  isRunning={isLiveRunning}
+                  pipelineStatus={pipelineStatus}
+                  onStartDetect={startDetection}
+                  onStartLive={() => setActiveModal('camera-picker')}
+                  onStop={stopPipeline}
+                  externalShowPicker={showVideoPicker}
+                  onPickerClose={() => setShowVideoPicker(false)}
+                  isMaximized={false}
+                  onMaximize={() => setMaximizedWindow('video')}
+                />
+              </div>
+
+              {/* Horizontal Resizer */}
+              <div 
+                className={`resizer-v ${isResizingRightTop ? 'active' : ''}`}
+                onMouseDown={(e) => { e.preventDefault(); setIsResizingRightTop(true); }}
+              />
+
+              {/* Map Panel — always visible below the feed */}
+              <div className="mac-window" style={{ flex: 1, display: 'flex', flexDirection: 'column', border: 'none' }}>
+                <div className="panel-header">
+                  <span>Map</span>
+                  <button 
+                    onClick={() => setMaximizedWindow('map')} 
+                    style={{ position: 'absolute', right: 4, background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}
+                    title="Maximize"
+                  >
+                    <Maximize2 size={12} />
+                  </button>
+                </div>
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <MapViewer
+                    events={filteredEvents}
+                    selectedId={selectedEventId}
+                    onSelect={setSelectedEventId}
+                    datasetMode={datasetMode}
+                    mapMode={mapMode}
+                    damageViewEnabled={damageViewEnabled}
+                    showRanking={showRanking}
+                    debugAlignment={debugAlignment}
+                  />
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Status Bar */}

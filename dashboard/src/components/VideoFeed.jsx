@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import useVideoSocket from '../hooks/useVideoSocket';
+import { Maximize2, Minimize2 } from 'lucide-react';
 
-const VideoFeed = ({ isRunning, pipelineStatus, onStartDetect, onStartLive, onStop, externalShowPicker, onPickerClose }) => {
+const VideoFeed = ({ isRunning, pipelineStatus, onStartDetect, onStartLive, onStop, externalShowPicker, onPickerClose, isMaximized, onMaximize }) => {
   const [videos, setVideos] = useState([]);
   const [showPicker, setShowPicker] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState(null);
@@ -122,6 +123,15 @@ const VideoFeed = ({ isRunning, pipelineStatus, onStartDetect, onStartLive, onSt
               {pipelineStatus?.source_path || ''}
             </span>
           </span>
+          {onMaximize && (
+            <button 
+              onClick={onMaximize} 
+              style={{ position: 'absolute', right: 4, background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}
+              title={isMaximized ? "Restore" : "Maximize"}
+            >
+              {isMaximized ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+            </button>
+          )}
         </div>
 
         {/* Toolbar */}
@@ -163,7 +173,18 @@ const VideoFeed = ({ isRunning, pipelineStatus, onStartDetect, onStartLive, onSt
   // ===== IDLE — show controls =====
   return (
     <div className="mac-window" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-      <div className="panel-header"><span>Video Feed</span></div>
+      <div className="panel-header">
+        <span>Video Feed</span>
+        {onMaximize && (
+          <button 
+            onClick={onMaximize} 
+            style={{ position: 'absolute', right: 4, background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}
+            title={isMaximized ? "Restore" : "Maximize"}
+          >
+            {isMaximized ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+          </button>
+        )}
+      </div>
 
       <div style={{
         flex: 1,
