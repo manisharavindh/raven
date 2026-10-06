@@ -5,6 +5,9 @@ const DefectTable = ({ events, selectedId, onSelect, onRefresh, isMaximized, onM
   const [searchQuery, setSearchQuery] = useState('');
   const [sortCol, setSortCol] = useState('event_id');
   const [sortAsc, setSortAsc] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
   const tableRef = useRef(null);
   const searchRef = useRef(null);
 
@@ -67,6 +70,17 @@ const DefectTable = ({ events, selectedId, onSelect, onRefresh, isMaximized, onM
 
     return result;
   }, [events, searchQuery, sortCol, sortAsc]);
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, sortCol, sortAsc, events.length]);
+
+  const totalPages = Math.ceil(filteredAndSorted.length / itemsPerPage);
+  const paginatedEvents = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredAndSorted.slice(start, start + itemsPerPage);
+  }, [filteredAndSorted, currentPage]);
 
   const handleDelete = async (e, id) => {
     e.stopPropagation();
@@ -153,9 +167,30 @@ const DefectTable = ({ events, selectedId, onSelect, onRefresh, isMaximized, onM
           style={{ flex: 1 }}
         />
         <span style={{ color: 'var(--text-secondary)', marginLeft: '12px', fontSize: 11, whiteSpace: 'nowrap' }}>
-          {filteredAndSorted.length} of {events.length} defects
+          {filteredAndSorted.length} defects
         </span>
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 10px', backgroundColor: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.1)', fontSize: 11 }}>
+          <button 
+            disabled={currentPage === 1} 
+            onClick={() => setCurrentPage(p => p - 1)}
+            style={{ padding: '2px 8px', fontSize: 10, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+          >
+            ◀ Prev
+          </button>
+          <span>Page {currentPage} of {totalPages}</span>
+          <button 
+            disabled={currentPage === totalPages} 
+            onClick={() => setCurrentPage(p => p + 1)}
+            style={{ padding: '2px 8px', fontSize: 10, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+          >
+            Next ▶
+          </button>
+        </div>
+      )}
 
       {/* Table */}
       <div style={{ flex: 1, overflow: 'auto' }} ref={tableRef}>
@@ -178,14 +213,14 @@ const DefectTable = ({ events, selectedId, onSelect, onRefresh, isMaximized, onM
             </tr>
           </thead>
           <tbody>
-            {filteredAndSorted.length === 0 ? (
+            {paginatedEvents.length === 0 ? (
               <tr>
                 <td colSpan={5} style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)' }}>
                   {events.length === 0 ? 'No defects detected.' : 'No results match your search.'}
                 </td>
               </tr>
             ) : (
-              filteredAndSorted.map((event) => {
+              paginatedEvents.map((event) => {
                 const isCleared = event.status === 'cleared';
                 return (
                   <tr

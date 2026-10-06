@@ -239,3 +239,5 @@ runs/
 *.pt
 !models/pothole_yolov8.pt
 !models/rdd2022_yolov8.pt
+data/demo/coimbatore/roads.geojson
+data/demo/coimbatore/vehicle_track.geojson

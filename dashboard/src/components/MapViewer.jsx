@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl, GeoJSON, Polyline } from 'react-leaflet';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, ZoomControl, GeoJSON, Polyline } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import 'react-leaflet-cluster/dist/assets/MarkerCluster.css';
 import 'react-leaflet-cluster/dist/assets/MarkerCluster.Default.css';
@@ -36,6 +36,15 @@ const MapController = ({ selectedId, events, selectedRoad, mapData, mapMode }) =
   return null;
 };
 
+const ZoomTracker = ({ onZoom }) => {
+  useMapEvents({
+    zoomend: (e) => {
+      onZoom(e.target.getZoom());
+    }
+  });
+  return null;
+};
+
 const iconCache = {};
 
 const getMarkerIcon = (type, isSelected) => {
@@ -68,12 +77,19 @@ const getMarkerIcon = (type, isSelected) => {
   return iconCache[key];
 };
 
-const MapViewer = ({ events, selectedId, onSelect, datasetMode, mapMode, damageViewEnabled, showRanking, debugAlignment }) => {
+const MapViewer = ({ events, selectedId, onSelect, datasetMode }) => {
   const defaultCenter = [11.0168, 76.9558];
   
   const [mapData, setMapData] = useState(null);
   const [selectedRoad, setSelectedRoad] = useState(null);
+  
+  const [mapMode, setMapMode] = useState('roads'); // 'points' or 'roads'
+  const [damageViewEnabled, setDamageViewEnabled] = useState(false);
+  const [showRanking, setShowRanking] = useState(false);
   const [showSelectedRoadPoints, setShowSelectedRoadPoints] = useState(false);
+  const [debugAlignment, setDebugAlignment] = useState(false);
+  const [isSampled, setIsSampled] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(13);
   
   const geojsonRef = useRef(null);
 
@@ -93,20 +109,27 @@ const MapViewer = ({ events, selectedId, onSelect, datasetMode, mapMode, damageV
 
   // Markers logic based on mode
   const displayEvents = useMemo(() => {
-    if (mapMode === 'points') return events; // show all
-    if (mapMode === 'roads') {
+    let result = [];
+    if (mapMode === 'points') {
+      if (events.length > 2000) {
+        const step = Math.ceil(events.length / 1500);
+        result = events.filter((_, i) => i % step === 0);
+      } else {
+        result = events;
+      }
+    } else if (mapMode === 'roads') {
       if (selectedRoad && showSelectedRoadPoints && mapData) {
         const roadFeature = mapData.features.find(f => f.properties.road_id === selectedRoad);
         if (roadFeature && roadFeature.properties.event_ids) {
           const eventIds = new Set(roadFeature.properties.event_ids);
-          return events.filter(e => eventIds.has(e.event_id));
+          result = events.filter(e => eventIds.has(e.event_id));
         }
-        return [];
+      } else if (debugAlignment) {
+        result = events; 
       }
-      if (debugAlignment) return events; // show all in debug
-      return []; // hide by default
     }
-    return [];
+    setIsSampled(mapMode === 'points' && events.length > 2000);
+    return result;
   }, [events, mapMode, selectedRoad, showSelectedRoadPoints, debugAlignment, mapData]);
 
   const memoizedMarkers = useMemo(() => {
@@ -132,23 +155,28 @@ const MapViewer = ({ events, selectedId, onSelect, datasetMode, mapMode, damageV
   }, [selectedEvent?.event_id]);
 
   // GeoJSON style for Road Damage mode
-  const styleFeature = (feature) => {
+  const styleFeature = useCallback((feature) => {
     const isSelected = feature.properties.road_id === selectedRoad;
     const level = feature.properties.damage_level;
     
     let color = damageColors[level] || '#aaa';
-    let weight = isSelected ? 8 : 4;
+    
+    const factor = Math.pow(1.3, zoomLevel - 15);
+    let baseWeight = isSelected ? 8 : 4;
     let opacity = isSelected ? 1.0 : 0.8;
     
     if (damageViewEnabled && !isSelected) {
       if (level === 'healthy' || level === 'low') {
         color = '#555';
         opacity = 0.3;
-        weight = 2;
+        baseWeight = 2;
       } else {
-        weight = 6;
+        baseWeight = 6;
       }
     }
+
+    let weight = baseWeight * factor;
+    weight = Math.max(1, Math.min(weight, 40));
 
     return {
       color,
@@ -158,7 +186,14 @@ const MapViewer = ({ events, selectedId, onSelect, datasetMode, mapMode, damageV
       lineJoin: 'round',
       className: isSelected ? 'road-selected' : 'road-segment'
     };
-  };
+  }, [selectedRoad, damageViewEnabled, zoomLevel]);
+
+  // Dynamically update styles when zoom or selections change
+  useEffect(() => {
+    if (geojsonRef.current && mapMode === 'roads') {
+      geojsonRef.current.setStyle(styleFeature);
+    }
+  }, [styleFeature, mapMode]);
 
   const onEachFeature = (feature, layer) => {
     layer.on({
@@ -178,9 +213,7 @@ const MapViewer = ({ events, selectedId, onSelect, datasetMode, mapMode, damageV
         if (mapMode !== 'roads') return;
         const layer = e.target;
         layer.closeTooltip();
-        if (geojsonRef.current) {
-          geojsonRef.current.resetStyle(layer);
-        }
+        layer.setStyle(styleFeature(feature));
       },
       click: (e) => {
         if (mapMode !== 'roads') return;
@@ -213,7 +246,17 @@ const MapViewer = ({ events, selectedId, onSelect, datasetMode, mapMode, damageV
   // Render
   return (
     <div style={{ position: 'relative', height: '100%', width: '100%', display: 'flex', flexDirection: 'column' }}>
-            <MapContainer
+      
+
+      {isSampled && (
+        <div style={{ position: 'absolute', top: 60, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, backgroundColor: 'rgba(231,76,60,0.85)', padding: '4px 12px', borderRadius: 12, color: 'white', fontSize: 10, fontWeight: 'bold' }}>
+          Displaying sampled points for performance ({displayEvents.length} of {events.length})
+        </div>
+      )}
+        
+
+
+      <MapContainer
         center={defaultCenter}
         zoom={13}
         maxZoom={22}
@@ -229,6 +272,7 @@ const MapViewer = ({ events, selectedId, onSelect, datasetMode, mapMode, damageV
           maxNativeZoom={20}
         />
         <ZoomControl position="bottomright" />
+        <ZoomTracker onZoom={setZoomLevel} />
         
         <MapController selectedId={selectedId} events={events} selectedRoad={selectedRoad} mapData={mapData} mapMode={mapMode} />
 
@@ -286,65 +330,79 @@ const MapViewer = ({ events, selectedId, onSelect, datasetMode, mapMode, damageV
 
       {/* Selected Road Details Panel */}
       {mapMode === 'roads' && selectedRoadData && (
-        <div className="mac-window" style={{
+        <div style={{
           position: 'absolute',
           top: 50,
           right: 20,
           zIndex: 1000,
+          backgroundColor: 'rgba(20, 20, 20, 0.85)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255,255,255,0.2)',
+          borderRadius: 8,
+          padding: 15,
           width: 250,
+          color: 'white',
+          boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
         }}>
-          <div className="panel-header">
-            <span>{selectedRoadData.road_name}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 15 }}>
+            <h3 style={{ margin: 0, fontSize: 16 }}>{selectedRoadData.road_name}</h3>
             <button 
               onClick={() => setSelectedRoad(null)}
-              style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 10, position: 'absolute', right: 4 }}
+              style={{ background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', fontSize: 16 }}
             >
               ✕
             </button>
           </div>
-          <div style={{ padding: 15 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12 }}>
-              <span>Damage Level</span>
-              <span style={{ fontWeight: 'bold', color: damageColors[selectedRoadData.damage_level] }}>
-                {selectedRoadData.damage_level.toUpperCase()}
-              </span>
-            </div>
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12 }}>
-              <span>Damage Score</span>
-              <span>{selectedRoadData.damage_score.toFixed(2)}</span>
-            </div>
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 15, fontSize: 12 }}>
-              <span>Total Detections</span>
-              <span>{selectedRoadData.detection_count}</span>
-            </div>
-
-            <button 
-              className="mac-btn"
-              onClick={() => setShowSelectedRoadPoints(!showSelectedRoadPoints)}
-              style={{ width: '100%', marginBottom: 10, justifyContent: 'center' }}
-            >
-              {showSelectedRoadPoints ? 'Hide Detections' : 'View Detections'}
-            </button>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12 }}>
+            <span style={{ color: '#aaa' }}>Damage Level</span>
+            <span style={{ fontWeight: 'bold', color: damageColors[selectedRoadData.damage_level] }}>
+              {selectedRoadData.damage_level.toUpperCase()}
+            </span>
           </div>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12 }}>
+            <span style={{ color: '#aaa' }}>Damage Score</span>
+            <span>{selectedRoadData.damage_score.toFixed(2)}</span>
+          </div>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 15, fontSize: 12 }}>
+            <span style={{ color: '#aaa' }}>Total Detections</span>
+            <span>{selectedRoadData.detection_count}</span>
+          </div>
+
+          <button 
+            className="mac-btn"
+            onClick={() => setShowSelectedRoadPoints(!showSelectedRoadPoints)}
+            style={{ width: '100%', marginBottom: 10 }}
+          >
+            {showSelectedRoadPoints ? 'Hide Detections' : 'View Detections'}
+          </button>
         </div>
       )}
 
       {/* Ranking Sidebar */}
       {mapMode === 'roads' && showRanking && !selectedRoadData && (
-        <div className="mac-window" style={{
+        <div style={{
           position: 'absolute',
           top: 50,
           right: 20,
           zIndex: 1000,
+          backgroundColor: 'rgba(20, 20, 20, 0.95)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 8,
+          padding: 15,
           width: 300,
           maxHeight: 'calc(100% - 100px)',
+          overflowY: 'auto',
+          color: 'white',
+          boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
         }}>
-          <div className="panel-header"><span>Most Damaged Roads</span></div>
-          <div style={{ padding: 10, overflowY: 'auto', flex: 1 }}>
+          <h3 style={{ margin: '0 0 15px 0', fontSize: 14, letterSpacing: 1 }}>MOST DAMAGED ROADS</h3>
+          
           {ranking.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>No road damage detected yet.</div>
+            <div style={{ fontSize: 12, color: '#888' }}>No road damage detected yet.</div>
           ) : (
             ranking.map((road, idx) => (
               <div 
@@ -357,20 +415,20 @@ const MapViewer = ({ events, selectedId, onSelect, datasetMode, mapMode, damageV
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  padding: '6px 0',
-                  borderBottom: '1px solid var(--mac-shadow)',
+                  padding: '10px 0',
+                  borderBottom: '1px solid rgba(255,255,255,0.05)',
                   cursor: 'pointer'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ fontSize: 12, width: 15 }}>{idx + 1}</div>
-                  <div style={{ fontSize: 12 }}>{road.road_name}</div>
+                  <div style={{ fontSize: 12, color: '#666', width: 15 }}>{idx + 1}</div>
+                  <div style={{ fontSize: 13 }}>{road.road_name}</div>
                 </div>
                 <div style={{ 
                   fontSize: 10, 
                   fontWeight: 'bold', 
-                  padding: '2px 4px',
-                  border: '1px solid var(--mac-shadow)',
+                  padding: '3px 8px',
+                  borderRadius: 4,
                   backgroundColor: damageColors[road.damage_level],
                   color: road.damage_level === 'moderate' || road.damage_level === 'low' ? 'black' : 'white'
                 }}>
@@ -379,25 +437,9 @@ const MapViewer = ({ events, selectedId, onSelect, datasetMode, mapMode, damageV
               </div>
             ))
           )}
-          </div>
         </div>
       )}
       
-      {/* Empty State Overlay */}
-      {events.length === 0 && (
-        <div className="mac-window" style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 900,
-          padding: 20,
-          textAlign: 'center',
-        }}>
-          <h3 style={{ margin: '0 0 10px 0' }}>No Detections</h3>
-          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 12 }}>Start a RAVEN analysis to populate the map.</p>
-        </div>
-      )}
     </div>
   );
 };

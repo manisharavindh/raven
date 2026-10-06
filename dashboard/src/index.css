@@ -429,6 +429,10 @@ input[type="text"]:focus, input[type="search"]:focus, input[type="number"]:focus
   filter: none !important; /* Full color map for readability */
 }
 
+path.road-segment, path.road-selected {
+  transition: stroke-width 0.3s ease-out, stroke 0.3s ease-out, stroke-opacity 0.3s ease-out;
+}
+
 .glass-popup .leaflet-popup-content-wrapper {
   background: var(--mac-white);
   color: var(--text-primary);

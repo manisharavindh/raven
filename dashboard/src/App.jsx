@@ -336,31 +336,78 @@ const App = () => {
       {/* Main Content */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
-        {maximizedWindow === 'defect-table' && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Left Column */}
+        <div style={{ 
+          width: maximizedWindow === 'defect-table' || maximizedWindow === 'evidence' ? '100%' : leftWidth, 
+          display: (maximizedWindow && maximizedWindow !== 'defect-table' && maximizedWindow !== 'evidence') ? 'none' : 'flex',
+          flexDirection: 'column', 
+          flexShrink: 0 
+        }}>
+          
+          {/* Top Left: Defect Table */}
+          <div style={{ 
+            height: maximizedWindow === 'defect-table' ? '100%' : leftTopHeight, 
+            display: maximizedWindow === 'evidence' ? 'none' : 'flex',
+            flexDirection: 'column', 
+            flexShrink: 0 
+          }}>
             <DefectTable
               events={filteredEvents}
               selectedId={selectedEventId}
               onSelect={setSelectedEventId}
               onRefresh={fetchTelemetryData}
-              isMaximized={true}
-              onMaximize={() => setMaximizedWindow(null)}
+              isMaximized={maximizedWindow === 'defect-table'}
+              onMaximize={() => setMaximizedWindow(maximizedWindow === 'defect-table' ? null : 'defect-table')}
             />
           </div>
-        )}
 
-        {maximizedWindow === 'evidence' && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          {/* Horizontal Resizer */}
+          {!maximizedWindow && (
+            <div 
+              className={`resizer-v ${isResizingTop ? 'active' : ''}`}
+              onMouseDown={(e) => { e.preventDefault(); setIsResizingTop(true); }}
+            />
+          )}
+
+          {/* Bottom Left: Evidence */}
+          <div style={{ 
+            flex: 1, 
+            display: maximizedWindow === 'defect-table' ? 'none' : 'flex',
+            flexDirection: 'column', 
+            minHeight: 0 
+          }}>
             <EvidenceViewer 
               event={selectedEvent} 
-              isMaximized={true}
-              onMaximize={() => setMaximizedWindow(null)}
+              isMaximized={maximizedWindow === 'evidence'}
+              onMaximize={() => setMaximizedWindow(maximizedWindow === 'evidence' ? null : 'evidence')}
             />
           </div>
+
+        </div>
+
+        {/* Vertical Resizer */}
+        {!maximizedWindow && (
+          <div 
+            className={`resizer-h ${isResizingLeft ? 'active' : ''}`}
+            onMouseDown={(e) => { e.preventDefault(); setIsResizingLeft(true); }}
+          />
         )}
 
-        {maximizedWindow === 'video' && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Right Column: Video Feed + Map */}
+        <div style={{ 
+          flex: 1, 
+          display: (maximizedWindow === 'defect-table' || maximizedWindow === 'evidence') ? 'none' : 'flex',
+          flexDirection: 'column', 
+          minWidth: 0 
+        }}>
+
+          {/* Video Feed Panel */}
+          <div style={{ 
+            height: maximizedWindow === 'video' ? '100%' : rightTopHeight, 
+            display: maximizedWindow === 'map' ? 'none' : 'flex',
+            flexDirection: 'column', 
+            flexShrink: 0 
+          }}>
             <VideoFeed
               isRunning={isLiveRunning}
               pipelineStatus={pipelineStatus}
@@ -369,22 +416,34 @@ const App = () => {
               onStop={stopPipeline}
               externalShowPicker={showVideoPicker}
               onPickerClose={() => setShowVideoPicker(false)}
-              isMaximized={true}
-              onMaximize={() => setMaximizedWindow(null)}
+              isMaximized={maximizedWindow === 'video'}
+              onMaximize={() => setMaximizedWindow(maximizedWindow === 'video' ? null : 'video')}
             />
           </div>
-        )}
 
-        {maximizedWindow === 'map' && (
-          <div className="mac-window" style={{ flex: 1, display: 'flex', flexDirection: 'column', border: 'none' }}>
+          {/* Horizontal Resizer */}
+          {!maximizedWindow && (
+            <div 
+              className={`resizer-v ${isResizingRightTop ? 'active' : ''}`}
+              onMouseDown={(e) => { e.preventDefault(); setIsResizingRightTop(true); }}
+            />
+          )}
+
+          {/* Map Panel */}
+          <div className="mac-window" style={{ 
+            flex: 1, 
+            display: maximizedWindow === 'video' ? 'none' : 'flex',
+            flexDirection: 'column', 
+            border: 'none' 
+          }}>
             <div className="panel-header">
               <span>Map</span>
               <button 
-                onClick={() => setMaximizedWindow(null)} 
+                onClick={() => setMaximizedWindow(maximizedWindow === 'map' ? null : 'map')} 
                 style={{ position: 'absolute', right: 4, background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}
-                title="Restore"
+                title={maximizedWindow === 'map' ? "Restore" : "Maximize"}
               >
-                <Minimize2 size={12} />
+                {maximizedWindow === 'map' ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
               </button>
             </div>
             <div style={{ flex: 1, position: 'relative' }}>
@@ -400,100 +459,7 @@ const App = () => {
               />
             </div>
           </div>
-        )}
-
-        {!maximizedWindow && (
-          <>
-            {/* Left Column */}
-            <div style={{ width: leftWidth, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-              
-              {/* Top Left: Defect Table */}
-              <div style={{ height: leftTopHeight, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-                <DefectTable
-                  events={filteredEvents}
-                  selectedId={selectedEventId}
-                  onSelect={setSelectedEventId}
-                  onRefresh={fetchTelemetryData}
-                  isMaximized={false}
-                  onMaximize={() => setMaximizedWindow('defect-table')}
-                />
-              </div>
-
-              {/* Horizontal Resizer */}
-              <div 
-                className={`resizer-v ${isResizingTop ? 'active' : ''}`}
-                onMouseDown={(e) => { e.preventDefault(); setIsResizingTop(true); }}
-              />
-
-              {/* Bottom Left: Evidence */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                <EvidenceViewer 
-                  event={selectedEvent} 
-                  isMaximized={false}
-                  onMaximize={() => setMaximizedWindow('evidence')}
-                />
-              </div>
-
-            </div>
-
-            {/* Vertical Resizer */}
-            <div 
-              className={`resizer-h ${isResizingLeft ? 'active' : ''}`}
-              onMouseDown={(e) => { e.preventDefault(); setIsResizingLeft(true); }}
-            />
-
-            {/* Right Column: Video Feed + Map */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-
-              {/* Video Feed Panel — always present, shows controls when idle */}
-              <div style={{ height: rightTopHeight, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-                <VideoFeed
-                  isRunning={isLiveRunning}
-                  pipelineStatus={pipelineStatus}
-                  onStartDetect={startDetection}
-                  onStartLive={() => setActiveModal('camera-picker')}
-                  onStop={stopPipeline}
-                  externalShowPicker={showVideoPicker}
-                  onPickerClose={() => setShowVideoPicker(false)}
-                  isMaximized={false}
-                  onMaximize={() => setMaximizedWindow('video')}
-                />
-              </div>
-
-              {/* Horizontal Resizer */}
-              <div 
-                className={`resizer-v ${isResizingRightTop ? 'active' : ''}`}
-                onMouseDown={(e) => { e.preventDefault(); setIsResizingRightTop(true); }}
-              />
-
-              {/* Map Panel — always visible below the feed */}
-              <div className="mac-window" style={{ flex: 1, display: 'flex', flexDirection: 'column', border: 'none' }}>
-                <div className="panel-header">
-                  <span>Map</span>
-                  <button 
-                    onClick={() => setMaximizedWindow('map')} 
-                    style={{ position: 'absolute', right: 4, background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}
-                    title="Maximize"
-                  >
-                    <Maximize2 size={12} />
-                  </button>
-                </div>
-                <div style={{ flex: 1, position: 'relative' }}>
-                  <MapViewer
-                    events={filteredEvents}
-                    selectedId={selectedEventId}
-                    onSelect={setSelectedEventId}
-                    datasetMode={datasetMode}
-                    mapMode={mapMode}
-                    damageViewEnabled={damageViewEnabled}
-                    showRanking={showRanking}
-                    debugAlignment={debugAlignment}
-                  />
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+        </div>
       </div>
 
       {/* Status Bar */}
