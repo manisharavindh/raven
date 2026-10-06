@@ -1,0 +1,12 @@
+{
+  "id": "cbe-synthetic-demo",
+  "name": "Coimbatore Synthetic Demo",
+  "type": "synthetic",
+  "files": {
+    "roads": "roads.geojson",
+    "road_damage": "road_damage.geojson",
+    "detections": "detections.json",
+    "vehicle_track": "vehicle_track.geojson",
+    "metadata": "metadata.json"
+  }
+}

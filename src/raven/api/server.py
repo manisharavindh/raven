@@ -35,6 +35,10 @@ db = RavenDatabase()
 os.makedirs("data/evidence", exist_ok=True)
 app.mount("/data/evidence", StaticFiles(directory="data/evidence"), name="evidence")
 
+# Mount the demo dataset directory
+os.makedirs("data/demo", exist_ok=True)
+app.mount("/demo", StaticFiles(directory="data/demo"), name="demo")
+
 
 # ================================================================== #
 #  Pipeline Runner — runs detection in a background thread

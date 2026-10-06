@@ -1,0 +1,12 @@
+{
+  "dataset_name": "RAVEN Coimbatore Synthetic Demo",
+  "dataset_type": "synthetic",
+  "city": "Coimbatore, Tamil Nadu, India",
+  "generated_at": "2026-10-06T14:43:29.458720",
+  "random_seed": 20261006,
+  "vehicles": 100,
+  "routes": 100,
+  "detections": 68667,
+  "gps_points": 457436,
+  "warning": "This dataset contains synthetic detections and synthetic vehicle telemetry. Road geometry is based on OpenStreetMap data."
+}

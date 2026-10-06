@@ -14,6 +14,7 @@ const App = () => {
   const [loading, setLoading] = useState(true);
   const [isLiveRunning, setIsLiveRunning] = useState(false);
   const [filterType, setFilterType] = useState('ALL');
+  const [datasetMode, setDatasetMode] = useState('live'); // 'live' | 'demo'
   const [pipelineStatus, setPipelineStatus] = useState(null);
   const [showVideoPicker, setShowVideoPicker] = useState(false);
 
@@ -90,13 +91,44 @@ const App = () => {
   }, []);
 
   useTelemetrySocket({
-    onDetections: handleDetections,
-    onReport: handleReport,
-    onStatus: handleStatus,
+    onDetections: (newDetections) => { if (datasetMode === 'live') handleDetections(newDetections); },
+    onReport: (newReport) => { if (datasetMode === 'live') handleReport(newReport); },
+    onStatus: (newStatus) => { if (datasetMode === 'live') handleStatus(newStatus); },
   });
+
+  // Fetch static dataset for demo mode
+  useEffect(() => {
+    if (datasetMode === 'demo') {
+      setIsLiveRunning(false);
+      setPipelineStatus({ running: false, status: 'stopped', source_type: 'synthetic_demo', source_path: 'data/demo/coimbatore' });
+      setReportData(null);
+      
+      fetch('/demo/coimbatore/detections.json')
+        .then(res => res.json())
+        .then(data => {
+          setEvents(data);
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error('Failed to load demo data:', err);
+          setLoading(false);
+        });
+    } else {
+      fetchTelemetryData();
+    }
+  }, [datasetMode]);
 
   // Manual refresh for menu action — triggers a one-shot HTTP fetch
   const fetchTelemetryData = useCallback(async () => {
+    if (datasetMode === 'demo') {
+      try {
+        const res = await fetch('/demo/coimbatore/detections.json');
+        if (res.ok) setEvents(await res.json());
+      } catch (err) {
+        console.error('Failed to reload demo data:', err);
+      }
+      return;
+    }
     try {
       const [reportRes, detectionsRes] = await Promise.all([
         fetch('/data/report.json'),
@@ -107,7 +139,7 @@ const App = () => {
     } catch (err) {
       console.error('Failed to load RAVEN data:', err);
     }
-  }, []);
+  }, [datasetMode]);
 
   const checkPipelineStatus = useCallback(async () => {
     try {
@@ -232,6 +264,8 @@ const App = () => {
       case 'export-csv': exportCSV(); break;
       case 'export-json': exportJSON(); break;
       case 'refresh': fetchTelemetryData(); break;
+      case 'set-dataset-live': setDatasetMode('live'); break;
+      case 'set-dataset-demo': setDatasetMode('demo'); break;
       case 'filter-all': setFilterType('ALL'); break;
       case 'filter-potholes': setFilterType('CRITICAL'); break;
       case 'filter-cracks': setFilterType('WARNING'); break;
@@ -279,6 +313,7 @@ const App = () => {
         onAction={handleMenuAction}
         isLiveRunning={isLiveRunning}
         filterType={filterType}
+        datasetMode={datasetMode}
       />
 
       {/* Main Content */}
@@ -346,6 +381,7 @@ const App = () => {
                 events={filteredEvents}
                 selectedId={selectedEventId}
                 onSelect={setSelectedEventId}
+                datasetMode={datasetMode}
               />
             </div>
           </div>

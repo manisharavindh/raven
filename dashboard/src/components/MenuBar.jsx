@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const MenuBar = ({ onAction, isLiveRunning, filterType }) => {
+const MenuBar = ({ onAction, isLiveRunning, filterType, datasetMode }) => {
   const [openMenu, setOpenMenu] = useState(null);
   const menuRef = useRef(null);
 
@@ -43,6 +43,10 @@ const MenuBar = ({ onAction, isLiveRunning, filterType }) => {
       { separator: true },
       { label: 'Stop Pipeline', action: 'stop-pipeline', disabled: !isLiveRunning },
     ],
+    Dataset: [
+      { label: 'Live / Current Data', action: 'set-dataset-live', checked: datasetMode === 'live' },
+      { label: 'Coimbatore Synthetic Demo', action: 'set-dataset-demo', checked: datasetMode === 'demo' },
+    ],
     Help: [
       { label: 'Keyboard Shortcuts', action: 'show-shortcuts' },
       { separator: true },
@@ -83,6 +87,24 @@ const MenuBar = ({ onAction, isLiveRunning, filterType }) => {
       ))}
 
       <div style={{ flex: 1 }} />
+      {datasetMode === 'demo' && (
+        <div style={{ 
+          marginRight: 15, 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 6,
+          backgroundColor: 'rgba(231, 76, 60, 0.2)',
+          border: '1px solid #e74c3c',
+          padding: '2px 8px',
+          borderRadius: 12,
+          fontSize: 11,
+          fontWeight: 'bold',
+          color: '#e74c3c'
+        }}>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#e74c3c', animation: 'pulse 2s infinite' }} />
+          SYNTHETIC DEMO
+        </div>
+      )}
       <div style={{ fontWeight: 'bold', paddingRight: 8 }}>RAVEN</div>
     </div>
   );

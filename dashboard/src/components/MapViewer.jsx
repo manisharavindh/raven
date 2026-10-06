@@ -68,7 +68,7 @@ const getMarkerIcon = (type, isSelected) => {
   return iconCache[key];
 };
 
-const MapViewer = ({ events, selectedId, onSelect }) => {
+const MapViewer = ({ events, selectedId, onSelect, datasetMode }) => {
   const defaultCenter = [11.0168, 76.9558];
   
   const [mapData, setMapData] = useState(null);
@@ -83,7 +83,8 @@ const MapViewer = ({ events, selectedId, onSelect }) => {
   const geojsonRef = useRef(null);
 
   useEffect(() => {
-    fetch('/api/map/roads')
+    const url = datasetMode === 'demo' ? '/demo/coimbatore/road_damage.geojson' : '/api/map/roads';
+    fetch(url)
       .then(res => res.json())
       .then(data => {
         if (data.type === 'FeatureCollection') {
@@ -91,7 +92,7 @@ const MapViewer = ({ events, selectedId, onSelect }) => {
         }
       })
       .catch(err => console.error("Failed to load map geometries", err));
-  }, [events]);
+  }, [events, datasetMode]);
 
   const selectedEvent = events.find(e => e.event_id === selectedId);
 
@@ -339,30 +340,6 @@ const MapViewer = ({ events, selectedId, onSelect }) => {
         )}
       </MapContainer>
 
-      {/* Legend - Bottom Left (Only in Road Damage Mode) */}
-      {mapMode === 'roads' && (
-        <div style={{
-          position: 'absolute',
-          bottom: 20,
-          left: 20,
-          zIndex: 1000,
-          backgroundColor: 'rgba(20, 20, 20, 0.85)',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: 8,
-          padding: 10,
-          color: 'white',
-          fontSize: 11
-        }}>
-          <div style={{ fontWeight: 'bold', marginBottom: 6, fontSize: 10, letterSpacing: 1 }}>ROAD CONDITION</div>
-          {Object.entries(damageColors).map(([level, color]) => (
-            <div key={level} style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-              <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: color, marginRight: 8 }}></div>
-              <span style={{ textTransform: 'capitalize' }}>{level}</span>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Selected Road Details Panel */}
       {mapMode === 'roads' && selectedRoadData && (
