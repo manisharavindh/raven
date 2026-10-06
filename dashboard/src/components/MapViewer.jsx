@@ -36,6 +36,23 @@ const MapController = ({ selectedId, events, selectedRoad, mapData, mapMode }) =
   return null;
 };
 
+const MapResizer = () => {
+  const map = useMap();
+  useEffect(() => {
+    const observer = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    const container = map.getContainer();
+    if (container) {
+      observer.observe(container);
+    }
+    return () => {
+      observer.disconnect();
+    };
+  }, [map]);
+  return null;
+};
+
 const ZoomTracker = ({ onZoom }) => {
   useMapEvents({
     zoomend: (e) => {
@@ -273,6 +290,7 @@ const MapViewer = ({ events, selectedId, onSelect, datasetMode }) => {
         />
         <ZoomControl position="bottomright" />
         <ZoomTracker onZoom={setZoomLevel} />
+        <MapResizer />
         
         <MapController selectedId={selectedId} events={events} selectedRoad={selectedRoad} mapData={mapData} mapMode={mapMode} />
 
