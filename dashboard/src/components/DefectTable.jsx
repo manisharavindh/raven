@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 
-const DefectTable = ({ events, selectedId, onSelect, onRefresh }) => {
+const DefectTable = ({ events, selectedId, onSelect, onRefresh, isMaximized, onMaximize }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortCol, setSortCol] = useState('event_id');
   const [sortAsc, setSortAsc] = useState(true);
@@ -130,6 +131,15 @@ const DefectTable = ({ events, selectedId, onSelect, onRefresh }) => {
     <div className="mac-window" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div className="panel-header">
         <span>Defect List</span>
+        {onMaximize && (
+          <button 
+            onClick={onMaximize} 
+            style={{ position: 'absolute', right: 4, background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}
+            title={isMaximized ? "Restore" : "Maximize"}
+          >
+            {isMaximized ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+          </button>
+        )}
       </div>
 
       {/* Toolbar with search */}

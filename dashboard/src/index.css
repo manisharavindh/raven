@@ -189,7 +189,7 @@ body {
     #b8b8b8 100%
   );
   color: var(--text-primary);
-  padding: 2px 8px;
+  padding: 2px 28px;
   font-weight: bold;
   font-size: 12px;
   border-bottom: 1px solid var(--mac-shadow);

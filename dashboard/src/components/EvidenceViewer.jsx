@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Maximize2, X, Copy, Check } from 'lucide-react';
+import { Maximize2, Minimize2, X, Copy, Check } from 'lucide-react';
 
-const EvidenceViewer = ({ event }) => {
+const EvidenceViewer = ({ event, isMaximized, onMaximize }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -30,7 +30,18 @@ const EvidenceViewer = ({ event }) => {
   if (!event) {
     return (
       <div className="mac-window" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div className="panel-header"><span>Evidence</span></div>
+        <div className="panel-header">
+          <span>Evidence</span>
+          {onMaximize && (
+            <button 
+              onClick={onMaximize} 
+              style={{ position: 'absolute', right: 4, background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}
+              title={isMaximized ? "Restore" : "Maximize"}
+            >
+              {isMaximized ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+            </button>
+          )}
+        </div>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', padding: 20 }}>
           Select a defect to view evidence.
         </div>
@@ -43,7 +54,18 @@ const EvidenceViewer = ({ event }) => {
   return (
     <>
       <div className="mac-window" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div className="panel-header"><span>Evidence — {event.event_id}</span></div>
+        <div className="panel-header">
+          <span>Evidence — {event.event_id}</span>
+          {onMaximize && (
+            <button 
+              onClick={onMaximize} 
+              style={{ position: 'absolute', right: 4, background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}
+              title={isMaximized ? "Restore" : "Maximize"}
+            >
+              {isMaximized ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+            </button>
+          )}
+        </div>
 
         <div style={{ display: 'flex', flexDirection: 'row', flex: 1, minHeight: 0 }}>
           {/* Evidence Image */}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const MenuBar = ({ onAction, isLiveRunning, filterType, datasetMode }) => {
+const MenuBar = ({ onAction, isLiveRunning, filterType, datasetMode, mapMode, damageViewEnabled, showRanking, debugAlignment }) => {
   const [openMenu, setOpenMenu] = useState(null);
   const menuRef = useRef(null);
 
@@ -46,6 +46,15 @@ const MenuBar = ({ onAction, isLiveRunning, filterType, datasetMode }) => {
     Dataset: [
       { label: 'Live / Current Data', action: 'set-dataset-live', checked: datasetMode === 'live' },
       { label: 'Coimbatore Synthetic Demo', action: 'set-dataset-demo', checked: datasetMode === 'demo' },
+    ],
+    Map: [
+      { label: 'Points Mode', action: 'map-mode-points', checked: mapMode === 'points' },
+      { label: 'Road Damage Mode', action: 'map-mode-roads', checked: mapMode === 'roads' },
+      { separator: true },
+      { label: 'Damage View', action: 'map-toggle-damage', checked: damageViewEnabled, disabled: mapMode !== 'roads' },
+      { label: 'Most Damaged Roads', action: 'map-toggle-ranking', checked: showRanking, disabled: mapMode !== 'roads' },
+      { separator: true },
+      { label: 'Dev Mode', action: 'map-toggle-debug', checked: debugAlignment },
     ],
     Help: [
       { label: 'Keyboard Shortcuts', action: 'show-shortcuts' },
